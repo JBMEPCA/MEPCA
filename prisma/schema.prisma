@@ -77,6 +77,40 @@ model FollowUpReminder {
   createdAt DateTime @default(now())
 }
 
+// A competitor website or magazine archive the automated watcher checks
+enum SourceType {
+  WEBSITE // scan pages for display/banner ads
+  PDF_ARCHIVE // watch for new issues with direct PDF downloads
+  FLIPBOOK // watch for new issues, but alert JB to run the skill manually
+}
+
+model WatchedSource {
+  id            String     @id @default(cuid())
+  name          String // competitor title, e.g. "Warehouse & Logistics News"
+  type          SourceType
+  url           String
+  active        Boolean    @default(true)
+  lastCheckedAt DateTime?
+  lastResult    String? // human-readable summary of the last scan
+  // URLs of issues/PDFs already processed, so we only handle new ones
+  seenItems     String[]   @default([])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  alerts SourceAlert[]
+}
+
+// "New issue is out" / "PDF too large" notices the watcher raises for JB
+model SourceAlert {
+  id        String        @id @default(cuid())
+  source    WatchedSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  sourceId  String
+  message   String
+  url       String?
+  dismissed Boolean       @default(false)
+  createdAt DateTime      @default(now())
+}
+
 model CompetitorAdvertiser {
   id                 String   @id @default(cuid())
   brand              String

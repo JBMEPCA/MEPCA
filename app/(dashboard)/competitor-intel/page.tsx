@@ -14,14 +14,17 @@ export const dynamic = "force-dynamic";
 export default async function CompetitorIntelPage({
   searchParams,
 }: {
-  searchParams: Promise<{ magazine?: string; q?: string; targets?: string }>;
+  searchParams: Promise<{ magazine?: string; q?: string; targets?: string; fresh?: string }>;
 }) {
-  const { magazine, q, targets } = await searchParams;
+  const { magazine, q, targets, fresh } = await searchParams;
 
   const where: Prisma.CompetitorAdvertiserWhereInput = {};
   if (magazine) where.competitorMagazine = magazine;
   if (q) where.brand = { contains: q, mode: "insensitive" };
   if (targets === "1") where.goodTarget = true;
+  if (fresh === "1") {
+    where.firstSeenAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+  }
 
   const [advertisers, magazines, total] = await Promise.all([
     db.competitorAdvertiser.findMany({ where, orderBy: { brand: "asc" }, take: 500 }),
@@ -34,7 +37,7 @@ export default async function CompetitorIntelPage({
   ]);
 
   const filterLink = (params: Record<string, string | undefined>) => {
-    const merged = { magazine, q, targets, ...params };
+    const merged = { magazine, q, targets, fresh, ...params };
     const qs = Object.entries(merged)
       .filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
@@ -57,6 +60,9 @@ export default async function CompetitorIntelPage({
       <div className="flex flex-wrap items-center gap-2">
         <Link href={filterLink({ targets: targets === "1" ? undefined : "1" })}>
           <Badge variant={targets === "1" ? "default" : "outline"}>Good targets only</Badge>
+        </Link>
+        <Link href={filterLink({ fresh: fresh === "1" ? undefined : "1" })}>
+          <Badge variant={fresh === "1" ? "default" : "outline"}>New this week</Badge>
         </Link>
         <span className="mx-1 text-neutral-300">|</span>
         <Link href={filterLink({ magazine: undefined })}>

@@ -22,7 +22,15 @@
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npm run build)",
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; git init -b main; git config user.name \"JB\"; git config user.email \"jb@cimltd.co.uk\"; git remote add origin https://github.com/JBMEPCA/MEPCA.git; git status --short | Select-Object -First 5)",
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma migrate dev --name init)",
-      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; node --env-file=.env scripts/seed-competitors.mjs)"
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; node --env-file=.env scripts/seed-competitors.mjs)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://mepca.vercel.app/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" https://mepca.vercel.app/api/inngest)",
+      "Bash(curl -s https://mepca.vercel.app/api/inngest)",
+      "Bash(curl -s \"https://mepca.vercel.app/competitor-intel\")",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npm install @anthropic-ai/sdk)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma migrate dev --name add-watcher; if \\($?\\) { npm run build })"
     ]
   }
 }
