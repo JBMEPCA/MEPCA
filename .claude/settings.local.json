@@ -30,7 +30,10 @@
       "Skill(claude-api)",
       "Skill(claude-api:*)",
       "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npm install @anthropic-ai/sdk)",
-      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma migrate dev --name add-watcher; if \\($?\\) { npm run build })"
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma migrate dev --name add-watcher; if \\($?\\) { npm run build })",
+      "Bash(curl -s -X PUT https://mepca.vercel.app/api/inngest)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; node --env-file=.env scripts/add-test-source.mjs)",
+      "Bash(curl -s -X POST \"https://inn.gs/e/Gv4bEhtzl9f9C5-TFAVaoK-yBABcPhVsx5ITxCRxarde58eXjzLL34YHMfECrkfpoCJoBvZtTY8017G9HKA2bQ\" -H \"Content-Type: application/json\" -d '{\"name\":\"sources/scan.requested\",\"data\":{\"sourceId\":\"cmrj9kuap0000nq8gufdd2gao\"}}')"
     ]
   }
 }

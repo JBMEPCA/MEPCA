@@ -111,7 +111,7 @@ function findIssueLinks(html: string, baseUrl: string, type: "PDF_ARCHIVE" | "FL
     if (type === "PDF_ARCHIVE" && /\.pdf(\?|$)/i.test(url)) links.add(url);
     if (
       type === "FLIPBOOK" &&
-      /issuu\.com|joomag\.com|flippingbook|flickread|flipbook|\/issue|\/edition|\/magazine\//i.test(url)
+      /yudu\.com|issuu\.com|joomag\.com|flippingbook|flickread|flipbook|\/issue|\/edition|\/magazine\//i.test(url)
     ) {
       links.add(url);
     }
@@ -127,6 +127,20 @@ export async function scanArchiveSource(source: WatchedSource) {
   const links = findIssueLinks(html, source.url, source.type as "PDF_ARCHIVE" | "FLIPBOOK");
   const seen = new Set(source.seenItems);
   const newLinks = links.filter((l) => !seen.has(l));
+
+  // First ever check: record what's already published without alerting/scanning,
+  // so we only ever react to issues that appear from now on
+  if (!source.lastCheckedAt) {
+    await db.watchedSource.update({
+      where: { id: source.id },
+      data: {
+        lastCheckedAt: new Date(),
+        lastResult: `Baseline recorded — ${links.length} existing issue(s), watching for new ones`,
+        seenItems: links,
+      },
+    });
+    return "Baseline recorded";
+  }
 
   let result: string;
 
