@@ -1,0 +1,95 @@
+// MEPCA Hub — data model
+// Plain-English guide:
+//   Campaign             = a booked ad campaign (the tracker)
+//   PipelineItem         = a pitched campaign awaiting sign-off (the pipeline)
+//   FollowUpReminder     = a dated nudge attached to a pipeline item or campaign
+//   CompetitorAdvertiser = a brand seen advertising in a competitor title
+//                          (imported from the Lead Sourcing spreadsheet)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled connection (port 6543) — used by the app
+  directUrl = env("DIRECT_URL") // session connection (port 5432) — used for migrations
+}
+
+enum CampaignStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  brand       String
+  package     String // package/spec booked, e.g. "Full page + web banner"
+  value       Decimal?       @db.Decimal(10, 2)
+  startDate   DateTime?
+  endDate     DateTime?
+  status      CampaignStatus @default(UPCOMING)
+  notes       String?
+  fileMakerId String?        @unique // stable key so FileMaker re-imports update instead of duplicate
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  reminders FollowUpReminder[]
+}
+
+enum PipelineStage {
+  PITCHED
+  PROPOSAL_SENT
+  NEGOTIATING
+  VERBAL_AGREEMENT
+  SIGNED_OFF
+  LOST
+}
+
+model PipelineItem {
+  id             String        @id @default(cuid())
+  brand          String
+  package        String?
+  estimatedValue Decimal?      @db.Decimal(10, 2)
+  stage          PipelineStage @default(PITCHED)
+  followUpDate   DateTime?
+  notes          String?
+  // set when the pitch is won and converted into a Campaign
+  convertedCampaignId String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  reminders FollowUpReminder[]
+}
+
+model FollowUpReminder {
+  id      String   @id @default(cuid())
+  dueDate DateTime
+  note    String?
+  done    Boolean  @default(false)
+
+  pipelineItem   PipelineItem? @relation(fields: [pipelineItemId], references: [id], onDelete: Cascade)
+  pipelineItemId String?
+  campaign       Campaign?     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaignId     String?
+
+  createdAt DateTime @default(now())
+}
+
+model CompetitorAdvertiser {
+  id                 String   @id @default(cuid())
+  brand              String
+  competitorMagazine String
+  adType             String?
+  whereFound         String?
+  confidenceNotes    String?
+  source             String?
+  goodTarget         Boolean  @default(false) // flagged by JB as worth pitching
+  pitched            Boolean  @default(false) // already contacted / in pipeline
+  // normalised "brand|magazine|adType" — lets spreadsheet re-imports update rows
+  // instead of duplicating them
+  dedupeKey          String   @unique
+  firstSeenAt        DateTime @default(now())
+  lastImportedAt     DateTime @default(now())
+}

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "Bash(where py *)",
+      "Read(//c/Program Files/**)",
+      "Bash(npm --version)",
+      "PowerShell(try { \\(Get-Command node -ErrorAction Stop\\).Source; node --version } catch { \"node: not installed\" }; try { \\(Get-Command git -ErrorAction Stop\\).Source; git --version } catch { \"git: not installed\" })",
+      "PowerShell($src = \"C:\\\\Users\\\\CIM Ltd\\\\Claude\\\\Projects\\\\Lead Sourcing\\\\MEPCA_Competitor_Advertisers_Pilot.xlsx\"; $dst = \"C:\\\\Users\\\\CIMLTD~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-CIM-Ltd--claude-Claude-Code-Projects-MEPCA-Hub\\\\ceb66f5b-4e17-48cd-8273-31c0d10e0085\\\\scratchpad\\\\xlsx_peek\"; Remove-Item -Recurse -Force $dst -ErrorAction SilentlyContinue; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory\\($src, $dst\\); Get-ChildItem \"$dst\\\\xl\" -Recurse -File | Select-Object -ExpandProperty FullName)",
+      "PowerShell($dst = \"C:\\\\Users\\\\CIMLTD~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-CIM-Ltd--claude-Claude-Code-Projects-MEPCA-Hub\\\\ceb66f5b-4e17-48cd-8273-31c0d10e0085\\\\scratchpad\\\\xlsx_peek\"; [xml]$wb = Get-Content \"$dst\\\\xl\\\\workbook.xml\"; $wb.workbook.sheets.sheet | ForEach-Object { $_.name }; $s1 = Get-Content \"$dst\\\\xl\\\\worksheets\\\\sheet1.xml\" -Raw; $s1.Substring\\(0, [Math]::Min\\(2500, $s1.Length\\)\\))",
+      "PowerShell(winget install --id Git.Git -e --accept-package-agreements --accept-source-agreements --silent)",
+      "PowerShell(winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements --silent)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); node --version; npm --version; git --version)",
+      "PowerShell($root = \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; Get-ChildItem \"$root\\\\mepca-hub\" -Force | Move-Item -Destination $root -Force; Remove-Item \"$root\\\\mepca-hub\" -Force; Get-ChildItem $root -Force | Select-Object Name)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx --yes shadcn@latest init -y -b neutral; if \\($?\\) { npx --yes shadcn@latest add -y button card dialog input label select table badge tabs textarea checkbox dropdown-menu })",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx --yes shadcn@latest init -y -d; if \\($?\\) { npx --yes shadcn@latest add -y button card dialog input label select table badge tabs textarea checkbox dropdown-menu })",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma generate)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npm install @prisma/client@6; if \\($?\\) { npm install -D prisma@6 }; if \\($?\\) { npx prisma generate })",
+      "Bash(tail -5 \"/c/Users/CIMLTD~1/AppData/Local/Temp/claude/C--Users-CIM-Ltd--claude-Claude-Code-Projects-MEPCA-Hub/ceb66f5b-4e17-48cd-8273-31c0d10e0085/tasks/bpqjkw3k8.output\" 2>/dev/null || echo \"no output yet\")",
+      "Bash(node -e \"console.log\\(require\\('inngest/package.json'\\).version\\)\")",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; node -e \"console.log\\(require\\('inngest/package.json'\\).version\\)\")",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npm run build)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; git init -b main; git config user.name \"JB\"; git config user.email \"jb@cimltd.co.uk\"; git remote add origin https://github.com/JBMEPCA/MEPCA.git; git status --short | Select-Object -First 5)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; npx prisma migrate dev --name init)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\('Path','Machine'\\) + ';' + [System.Environment]::GetEnvironmentVariable\\('Path','User'\\); Set-Location \"C:\\\\Users\\\\CIM Ltd\\\\.claude\\\\Claude Code Projects\\\\MEPCA Hub\"; node --env-file=.env scripts/seed-competitors.mjs)"
+    ]
+  }
+}
