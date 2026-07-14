@@ -37,6 +37,7 @@ const POSITIONS = [
   "MEPCA Advertising", "Website Homescreen", "Show Review", "Show Preview",
   "12 month", "12 Month", "Section", "Advertising",
   "Website Exclusive", "YEARPLANNERS", "Yearplanner",
+  "Solus eshot", "Solus e-shot", "Solus",
 ];
 
 const MONTHS = {

@@ -33,6 +33,7 @@ model Campaign {
   notes       String?
   saleDate    DateTime? // when the booking was made (drives the Sales page)
   issue       String? // which issue it runs in, e.g. "Dec 2023"
+  contentReceived Boolean @default(false) // artwork/content in hand — the chase tick
   fileMakerId String?        @unique // stable key so FileMaker re-imports update instead of duplicate
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt

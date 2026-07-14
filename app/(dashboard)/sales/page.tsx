@@ -13,58 +13,64 @@ const gbp = new Intl.NumberFormat("en-GB", {
 
 export default async function SalesPage() {
   const campaigns = await db.campaign.findMany({
-    where: { saleDate: { not: null }, value: { not: null } },
-    select: { saleDate: true, value: true, brand: true, package: true, issue: true },
-    orderBy: { saleDate: "asc" },
+    where: { startDate: { not: null } },
+    select: {
+      startDate: true, saleDate: true, value: true, brand: true, package: true, issue: true,
+    },
   });
 
-  const byMonth = new Map<string, { total: number; count: number }>();
+  // Revenue attributed to the issue each booking runs in
+  const byIssueMonth = new Map<string, { total: number; count: number }>();
   let lifetime = 0;
   for (const c of campaigns) {
-    const key = format(c.saleDate!, "yyyy-MM");
-    const entry = byMonth.get(key) ?? { total: 0, count: 0 };
-    entry.total += Number(c.value);
+    const key = format(c.startDate!, "yyyy-MM");
+    const entry = byIssueMonth.get(key) ?? { total: 0, count: 0 };
+    entry.total += Number(c.value ?? 0);
     entry.count += 1;
-    byMonth.set(key, entry);
-    lifetime += Number(c.value);
+    byIssueMonth.set(key, entry);
+    lifetime += Number(c.value ?? 0);
   }
 
   const now = new Date();
   const thisMonthKey = format(now, "yyyy-MM");
-  const lastMonthKey = format(new Date(now.getFullYear(), now.getMonth() - 1, 1), "yyyy-MM");
   const thisYear = String(now.getFullYear());
 
-  const months: MonthlySales[] = [...byMonth.entries()]
+  const months: MonthlySales[] = [...byIssueMonth.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, v]) => ({
       month,
       label: format(new Date(`${month}-01`), "MMM yy"),
       total: Math.round(v.total),
       count: v.count,
+      future: month > thisMonthKey,
     }));
 
-  const last24 = months.slice(-24);
+  // Show the last 12 issues plus everything booked in the future
+  const firstShown = Math.max(0, months.filter((m) => !m.future).length - 12);
+  const chartData = months.slice(firstShown);
+
   const ytd = months
     .filter((m) => m.month.startsWith(thisYear))
     .reduce((s, m) => s + m.total, 0);
-  const thisMonth = byMonth.get(thisMonthKey)?.total ?? 0;
-  const lastMonth = byMonth.get(lastMonthKey)?.total ?? 0;
-  const momChange = lastMonth > 0 ? ((thisMonth - lastMonth) / lastMonth) * 100 : null;
+  const currentIssue = months.find((m) => m.month === thisMonthKey);
+  const nextIssue = months.find((m) => m.future);
+  const futureTotal = months.filter((m) => m.future).reduce((s, m) => s + m.total, 0);
   const best = months.reduce(
     (top, m) => (m.total > top.total ? m : top),
-    { label: "—", total: 0, month: "", count: 0 }
+    { label: "—", total: 0, month: "", count: 0, future: false }
   );
-  const monthsWithSales = months.length || 1;
-  const average = lifetime / monthsWithSales;
 
-  const recentSales = [...campaigns].reverse().slice(0, 10);
+  const recentSales = campaigns
+    .filter((c) => c.saleDate && Number(c.value ?? 0) > 0)
+    .sort((a, b) => b.saleDate!.getTime() - a.saleDate!.getTime())
+    .slice(0, 10);
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Sales</h1>
         <p className="text-sm text-muted-foreground">
-          Every booking from the FileMaker ledger onwards, by the month it was sold.
+          Revenue by issue — including issues still to come. Purple bars are the future.
         </p>
       </div>
 
@@ -75,40 +81,47 @@ export default async function SalesPage() {
           <div className="mt-1 text-xs text-muted-foreground">{campaigns.length} bookings</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">This year</div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">
+            {thisYear} issues
+          </div>
           <div className="mt-1 text-3xl font-bold">{gbp.format(ytd)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{thisYear} to date</div>
+          <div className="mt-1 text-xs text-muted-foreground">whole year, booked so far</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">This month</div>
-          <div className="mt-1 text-3xl font-bold">{gbp.format(thisMonth)}</div>
+          <div className="text-xs uppercase tracking-widest text-muted-foreground">
+            {currentIssue ? `This issue (${currentIssue.label})` : "This issue"}
+          </div>
+          <div className="mt-1 text-3xl font-bold">{gbp.format(currentIssue?.total ?? 0)}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {momChange === null
-              ? "no sales last month"
-              : `${momChange >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(momChange))}% vs last month`}
+            {currentIssue?.count ?? 0} bookings
           </div>
         </div>
-        <div className="rounded-2xl border bg-card p-5">
-          <div className="text-xs uppercase tracking-widest text-muted-foreground">Best month</div>
-          <div className="mt-1 text-3xl font-bold">{gbp.format(best.total)}</div>
+        <div className="rounded-2xl border border-violet-500/30 bg-violet-500/10 p-5">
+          <div className="text-xs uppercase tracking-widest text-violet-300">
+            Future issues
+          </div>
+          <div className="mt-1 text-3xl font-bold text-violet-300">{gbp.format(futureTotal)}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {best.label} · avg {gbp.format(average)}/mo
+            {nextIssue ? `next: ${nextIssue.label} at ${gbp.format(nextIssue.total)}` : "none booked yet"}
           </div>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Monthly sales — last 24 months</CardTitle>
+          <CardTitle>Revenue by issue — last 12 + upcoming</CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesChart data={last24} />
+          <SalesChart data={chartData} />
+          <p className="mt-2 text-xs text-muted-foreground">
+            Best issue ever: {best.label} at {gbp.format(best.total)}
+          </p>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Latest bookings</CardTitle>
+          <CardTitle>Recently sold</CardTitle>
         </CardHeader>
         <CardContent>
           <ul className="divide-y divide-border">

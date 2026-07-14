@@ -17,16 +17,47 @@ const statusStyles: Record<string, { label: string; className: string }> = {
   COMPLETED: { label: "Completed", className: "bg-white/10 text-muted-foreground hover:bg-white/10" },
 };
 
-const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
+const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string }>;
+}) {
+  const { q } = await searchParams;
+
   const campaigns = await db.campaign.findMany({
-    orderBy: [{ status: "asc" }, { startDate: "desc" }],
+    where: q ? { brand: { contains: q, mode: "insensitive" } } : undefined,
+    orderBy: [{ startDate: "desc" }],
   });
 
+  // Group into one expandable row per brand
+  const brands = new Map<string, typeof campaigns>();
+  for (const c of campaigns) {
+    brands.set(c.brand, [...(brands.get(c.brand) ?? []), c]);
+  }
+
+  const brandSummaries = [...brands.entries()]
+    .map(([brand, items]) => {
+      const starts = items.map((i) => i.startDate).filter(Boolean) as Date[];
+      const ends = items.map((i) => i.endDate).filter(Boolean) as Date[];
+      const total = items.reduce((s, i) => s + Number(i.value ?? 0), 0);
+      const hasLive = items.some((i) => i.status === "LIVE");
+      const hasUpcoming = items.some((i) => i.status === "UPCOMING");
+      return {
+        brand,
+        items,
+        total,
+        start: starts.length ? new Date(Math.min(...starts.map((d) => d.getTime()))) : null,
+        end: ends.length ? new Date(Math.max(...ends.map((d) => d.getTime()))) : null,
+        state: hasLive ? "LIVE" : hasUpcoming ? "UPCOMING" : "COMPLETED",
+      };
+    })
+    .sort((a, b) => (b.end?.getTime() ?? 0) - (a.end?.getTime() ?? 0));
+
   const liveValue = campaigns
-    .filter((c) => c.status === "LIVE")
-    .reduce((sum, c) => sum + Number(c.value ?? 0), 0);
+    .filter((c) => c.status !== "COMPLETED")
+    .reduce((s, c) => s + Number(c.value ?? 0), 0);
 
   return (
     <div className="space-y-6">
@@ -34,7 +65,9 @@ export default async function CampaignsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
           <p className="text-sm text-muted-foreground">
-            {campaigns.filter((c) => c.status === "LIVE").length} live worth {gbp.format(liveValue)}
+            {brandSummaries.length} brands · {campaigns.length} bookings ·{" "}
+            <span className="text-primary">{gbp.format(liveValue)}</span>
+            {" live & upcoming"}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -43,59 +76,96 @@ export default async function CampaignsPage() {
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Brand</TableHead>
-            <TableHead>Package / spec</TableHead>
-            <TableHead>Value</TableHead>
-            <TableHead>Start</TableHead>
-            <TableHead>End</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {campaigns.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                No campaigns yet. Add one manually or import your FileMaker export.
-              </TableCell>
-            </TableRow>
-          )}
-          {campaigns.map((c) => {
-            const status = statusStyles[c.status] ?? statusStyles.UPCOMING;
-            return (
-              <TableRow key={c.id}>
-                <TableCell className="font-medium">{c.brand}</TableCell>
-                <TableCell>{c.package}</TableCell>
-                <TableCell>{c.value != null ? gbp.format(Number(c.value)) : "—"}</TableCell>
-                <TableCell>{c.startDate ? format(c.startDate, "d MMM yyyy") : "—"}</TableCell>
-                <TableCell>{c.endDate ? format(c.endDate, "d MMM yyyy") : "—"}</TableCell>
-                <TableCell>
-                  <Badge className={status.className}>{status.label}</Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <CampaignFormDialog
-                    campaign={{
-                      id: c.id,
-                      brand: c.brand,
-                      package: c.package,
-                      value: c.value?.toString(),
-                      startDate: c.startDate ? format(c.startDate, "yyyy-MM-dd") : undefined,
-                      endDate: c.endDate ? format(c.endDate, "yyyy-MM-dd") : undefined,
-                      status: c.status,
-                      notes: c.notes ?? undefined,
-                    }}
-                    trigger={<Button variant="ghost" size="sm">Edit</Button>}
-                  />
-                  <DeleteCampaignButton id={c.id} brand={c.brand} />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+      <form action="/campaigns">
+        <input
+          type="search"
+          name="q"
+          defaultValue={q}
+          placeholder="Search brands…"
+          className="h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs"
+        />
+      </form>
+
+      <div className="space-y-2">
+        {brandSummaries.length === 0 && (
+          <p className="py-10 text-center text-muted-foreground">
+            No campaigns{q ? ` matching “${q}”` : " yet"}.
+          </p>
+        )}
+        {brandSummaries.map((b) => {
+          const state = statusStyles[b.state];
+          return (
+            <details key={b.brand} className="group rounded-xl border bg-card">
+              <summary className="flex cursor-pointer items-center justify-between gap-4 px-4 py-3 [&::-webkit-details-marker]:hidden">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="text-muted-foreground transition-transform group-open:rotate-90">▸</span>
+                  <span className="truncate font-medium">{b.brand}</span>
+                  <Badge className={state.className}>{state.label}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {b.items.length} booking{b.items.length > 1 ? "s" : ""}
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-4 text-sm">
+                  <span className="text-muted-foreground">
+                    {b.start ? format(b.start, "MMM yy") : "—"} → {b.end ? format(b.end, "MMM yy") : "—"}
+                  </span>
+                  <span className="min-w-20 text-right font-semibold text-primary">
+                    {gbp.format(b.total)}
+                  </span>
+                </span>
+              </summary>
+              <div className="border-t border-border px-2 pb-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Package / position</TableHead>
+                      <TableHead>Issue</TableHead>
+                      <TableHead>Value</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Sold</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {b.items.map((c) => {
+                      const s = statusStyles[c.status] ?? statusStyles.UPCOMING;
+                      return (
+                        <TableRow key={c.id}>
+                          <TableCell>{c.package}</TableCell>
+                          <TableCell>{c.issue ?? (c.startDate ? format(c.startDate, "MMM yyyy") : "—")}</TableCell>
+                          <TableCell>{c.value != null ? gbp.format(Number(c.value)) : "—"}</TableCell>
+                          <TableCell>
+                            <Badge className={s.className}>{s.label}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {c.saleDate ? format(c.saleDate, "d MMM yy") : "—"}
+                          </TableCell>
+                          <TableCell className="space-x-1 text-right">
+                            <CampaignFormDialog
+                              campaign={{
+                                id: c.id,
+                                brand: c.brand,
+                                package: c.package,
+                                value: c.value?.toString(),
+                                startDate: c.startDate ? format(c.startDate, "yyyy-MM-dd") : undefined,
+                                endDate: c.endDate ? format(c.endDate, "yyyy-MM-dd") : undefined,
+                                status: c.status,
+                                notes: c.notes ?? undefined,
+                              }}
+                              trigger={<Button variant="ghost" size="sm">Edit</Button>}
+                            />
+                            <DeleteCampaignButton id={c.id} brand={c.brand} />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </details>
+          );
+        })}
+      </div>
     </div>
   );
 }
