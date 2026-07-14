@@ -32,7 +32,7 @@ export function DeletePipelineButton({ id, brand }: { id: string; brand: string 
     <Button
       variant="ghost"
       size="sm"
-      className="text-red-600 hover:text-red-700"
+      className="text-red-400 hover:text-red-300"
       onClick={() => {
         if (confirm(`Delete the ${brand} pitch? This can't be undone.`)) {
           deletePipelineItem(id);

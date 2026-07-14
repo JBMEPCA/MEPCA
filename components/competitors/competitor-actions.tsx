@@ -40,7 +40,7 @@ export function CompetitorSheetUpload() {
       <Button disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? "Syncing…" : "Sync spreadsheet"}
       </Button>
-      {result && <span className="text-sm text-neutral-500">{result}</span>}
+      {result && <span className="text-sm text-muted-foreground">{result}</span>}
     </div>
   );
 }

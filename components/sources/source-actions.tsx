@@ -133,7 +133,7 @@ export function DeleteSourceButton({ id, name }: { id: string; name: string }) {
     <Button
       variant="ghost"
       size="sm"
-      className="text-red-600 hover:text-red-700"
+      className="text-red-400 hover:text-red-300"
       onClick={() => {
         if (confirm(`Stop watching ${name}? Its alerts will also be removed.`)) {
           deleteSource(id);

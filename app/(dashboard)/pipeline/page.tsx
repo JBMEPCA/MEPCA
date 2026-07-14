@@ -17,12 +17,12 @@ export const dynamic = "force-dynamic";
 const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
 
 const stageBadge: Record<string, string> = {
-  PITCHED: "bg-neutral-100 text-neutral-700 hover:bg-neutral-100",
-  PROPOSAL_SENT: "bg-blue-100 text-blue-800 hover:bg-blue-100",
-  NEGOTIATING: "bg-amber-100 text-amber-800 hover:bg-amber-100",
-  VERBAL_AGREEMENT: "bg-violet-100 text-violet-800 hover:bg-violet-100",
-  SIGNED_OFF: "bg-green-100 text-green-800 hover:bg-green-100",
-  LOST: "bg-red-100 text-red-700 hover:bg-red-100",
+  PITCHED: "bg-white/10 text-muted-foreground hover:bg-white/10",
+  PROPOSAL_SENT: "bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/15",
+  NEGOTIATING: "bg-amber-500/15 text-amber-300 hover:bg-amber-500/15",
+  VERBAL_AGREEMENT: "bg-violet-500/15 text-violet-300 hover:bg-violet-500/15",
+  SIGNED_OFF: "bg-green-500/15 text-green-400 hover:bg-green-500/15",
+  LOST: "bg-red-500/15 text-red-400 hover:bg-red-500/15",
 };
 
 export default async function PipelinePage() {
@@ -39,7 +39,7 @@ export default async function PipelinePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted-foreground">
             {open.length} open pitches worth {gbp.format(openValue)}
           </p>
         </div>
@@ -50,7 +50,7 @@ export default async function PipelinePage() {
 
       {closed.length > 0 && (
         <details className="pt-4">
-          <summary className="cursor-pointer text-sm font-medium text-neutral-500">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">
             Closed ({closed.length})
           </summary>
           <div className="pt-3">
@@ -80,7 +80,7 @@ function PipelineTable({ items, emptyMessage }: { items: Item[]; emptyMessage: s
       <TableBody>
         {items.length === 0 && (
           <TableRow>
-            <TableCell colSpan={6} className="py-10 text-center text-neutral-500">
+            <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -101,7 +101,7 @@ function PipelineTable({ items, emptyMessage }: { items: Item[]; emptyMessage: s
               </TableCell>
               <TableCell>
                 {item.followUpDate ? (
-                  <span className={overdue && isOpen ? "font-semibold text-red-600" : ""}>
+                  <span className={overdue && isOpen ? "font-semibold text-red-400" : ""}>
                     {format(item.followUpDate, "d MMM yyyy")}
                   </span>
                 ) : (

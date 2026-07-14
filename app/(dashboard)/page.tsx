@@ -46,7 +46,7 @@ export default async function OverviewPage() {
           </CardHeader>
           <CardContent>
             {dueFollowUps.length === 0 ? (
-              <p className="text-sm text-neutral-500">Nothing due — you&apos;re on top of it.</p>
+              <p className="text-sm text-muted-foreground">Nothing due — you&apos;re on top of it.</p>
             ) : (
               <ul className="space-y-2">
                 {dueFollowUps.map((item) => (
@@ -68,13 +68,13 @@ export default async function OverviewPage() {
           </CardHeader>
           <CardContent>
             {endingSoon.length === 0 ? (
-              <p className="text-sm text-neutral-500">No campaigns ending soon.</p>
+              <p className="text-sm text-muted-foreground">No campaigns ending soon.</p>
             ) : (
               <ul className="space-y-2">
                 {endingSoon.map((c) => (
                   <li key={c.id} className="flex items-center justify-between text-sm">
                     <span className="font-medium">{c.brand}</span>
-                    <span className="text-neutral-500">
+                    <span className="text-muted-foreground">
                       ends {c.endDate ? format(c.endDate, "d MMM") : ""}
                     </span>
                   </li>
@@ -91,10 +91,10 @@ export default async function OverviewPage() {
 function StatCard({ label, value, href }: { label: string; value: number; href: string }) {
   return (
     <Link href={href}>
-      <Card className="transition-colors hover:bg-neutral-50">
+      <Card className="transition-colors hover:border-primary/50">
         <CardContent className="pt-6">
           <div className="text-3xl font-bold">{value}</div>
-          <div className="text-sm text-neutral-500">{label}</div>
+          <div className="text-sm text-muted-foreground">{label}</div>
         </CardContent>
       </Card>
     </Link>

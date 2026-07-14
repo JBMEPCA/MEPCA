@@ -40,7 +40,7 @@ export function FileMakerImportButton() {
       <Button variant="outline" disabled={busy} onClick={() => inputRef.current?.click()}>
         {busy ? "Importing…" : "Import FileMaker CSV"}
       </Button>
-      {result && <span className="text-sm text-neutral-500">{result}</span>}
+      {result && <span className="text-sm text-muted-foreground">{result}</span>}
     </div>
   );
 }

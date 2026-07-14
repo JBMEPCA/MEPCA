@@ -133,26 +133,25 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
           ? "investigating"
           : "sleeping";
 
-  // Pointer-based drag: pick the spy up, drop him on a tile to launch a scan
+  // Pointer-based drag: pick the spy up, drop him on a tile to launch a scan.
+  // Window-level listeners + pointer-events:none on the spy while dragging,
+  // so elementFromPoint sees the tile underneath rather than the spy himself.
   const onPointerDown = useCallback((e: React.PointerEvent) => {
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    e.preventDefault();
     setDragPos({ x: e.clientX, y: e.clientY });
   }, []);
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!dragPos) return;
+  useEffect(() => {
+    if (!dragPos) return;
+
+    function onMove(e: PointerEvent) {
       setDragPos({ x: e.clientX, y: e.clientY });
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const tile = el?.closest?.("[data-hq-tile]") as HTMLElement | null;
       setHoverTile(tile?.dataset.hqTile ?? null);
-    },
-    [dragPos]
-  );
+    }
 
-  const onPointerUp = useCallback(
-    async (e: React.PointerEvent) => {
-      if (!dragPos) return;
+    async function onUp(e: PointerEvent) {
       const el = document.elementFromPoint(e.clientX, e.clientY);
       const tile = el?.closest?.("[data-hq-tile]") as HTMLElement | null;
       setDragPos(null);
@@ -164,9 +163,16 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
         );
         await requestScanForTitle(name);
       }
-    },
-    [dragPos]
-  );
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragPos !== null]);
 
   const nextMonday = useMemo(() => {
     const d = new Date();
@@ -175,13 +181,13 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
   }, []);
 
   return (
-    <div ref={arenaRef} className="relative rounded-2xl border bg-neutral-50 p-6">
+    <div ref={arenaRef} className="hq-arena relative rounded-2xl border bg-card/50 p-6">
       <div className="mb-5 flex items-start justify-between">
         <div className="flex items-end gap-4">
           <div ref={homeRef} style={{ width: 88, height: 119 }} />
           <div className="pb-2">
             <div className="text-sm font-semibold">Agent Intel</div>
-            <div className="text-xs text-neutral-500">
+            <div className="text-xs text-muted-foreground">
               {spyState === "sleeping" && `Sleeping — next patrol ${nextMonday}, 06:00`}
               {spyState === "walking" && "On the move…"}
               {spyState === "investigating" && activeTitle && `Investigating ${activeTitle.name}…`}
@@ -205,6 +211,7 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
                 top: dragPos.y - 60,
                 transition: "none",
                 zIndex: 50,
+                pointerEvents: "none",
               }
             : {
                 left: 24,
@@ -214,8 +221,6 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
               }
         }
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
         title="Drag me onto a title to scan it now"
       >
         <Spy state={spyState} />
@@ -223,12 +228,15 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
 
       {/* speech bubble when reporting */}
       {report && (
-        <div className="absolute left-28 top-3 z-20 max-w-sm rounded-xl border bg-white px-3 py-2 text-xs shadow-sm">
+        <div className="absolute left-28 top-3 z-20 max-w-sm rounded-xl border border-primary/40 bg-popover px-3 py-2 text-xs shadow-sm">
           {report}
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 pt-16 sm:grid-cols-3 lg:grid-cols-5">
+      <div
+        className="grid gap-2.5 pt-16"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))" }}
+      >
         {titles.map((t) => (
           <div
             key={t.name}
@@ -236,20 +244,20 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
             ref={(el) => {
               if (el) tileRefs.current.set(t.name, el);
             }}
-            className={`flex flex-col items-center gap-2 rounded-xl border bg-white p-3 text-center transition-colors ${
+            className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border bg-card p-2.5 text-center transition-colors ${
               t.busy ? "hq-tile--scanning" : ""
-            } ${hoverTile === t.name ? "border-blue-500 bg-blue-50" : ""}`}
+            } ${hoverTile === t.name ? "border-primary bg-primary/10" : ""}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`https://www.google.com/s2/favicons?domain=${t.hostname}&sz=64`}
               alt=""
-              width={28}
-              height={28}
+              width={24}
+              height={24}
               className="rounded"
             />
-            <div className="text-xs font-medium leading-tight">{t.name}</div>
-            <div className="text-[11px] text-neutral-400">
+            <div className="w-full break-words text-[11px] font-medium leading-tight">{t.name}</div>
+            <div className="text-[10px] text-muted-foreground">
               {t.busy
                 ? t.sources.some((s) => s.scanStatus === "SCANNING")
                   ? "Being investigated…"

@@ -12,9 +12,9 @@ import { FileMakerImportButton } from "@/components/campaigns/filemaker-import-b
 export const dynamic = "force-dynamic";
 
 const statusStyles: Record<string, { label: string; className: string }> = {
-  LIVE: { label: "Live", className: "bg-green-100 text-green-800 hover:bg-green-100" },
-  UPCOMING: { label: "Upcoming", className: "bg-blue-100 text-blue-800 hover:bg-blue-100" },
-  COMPLETED: { label: "Completed", className: "bg-neutral-100 text-neutral-600 hover:bg-neutral-100" },
+  LIVE: { label: "Live", className: "bg-green-500/15 text-green-400 hover:bg-green-500/15" },
+  UPCOMING: { label: "Upcoming", className: "bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/15" },
+  COMPLETED: { label: "Completed", className: "bg-white/10 text-muted-foreground hover:bg-white/10" },
 };
 
 const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" });
@@ -33,7 +33,7 @@ export default async function CampaignsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted-foreground">
             {campaigns.filter((c) => c.status === "LIVE").length} live worth {gbp.format(liveValue)}
           </p>
         </div>
@@ -58,7 +58,7 @@ export default async function CampaignsPage() {
         <TableBody>
           {campaigns.length === 0 && (
             <TableRow>
-              <TableCell colSpan={7} className="py-10 text-center text-neutral-500">
+              <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                 No campaigns yet. Add one manually or import your FileMaker export.
               </TableCell>
             </TableRow>
