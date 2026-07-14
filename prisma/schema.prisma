@@ -84,12 +84,20 @@ enum SourceType {
   FLIPBOOK // watch for new issues, but alert JB to run the skill manually
 }
 
+// Live state the Agent HQ spy animation reads
+enum ScanStatus {
+  IDLE
+  QUEUED
+  SCANNING
+}
+
 model WatchedSource {
   id            String     @id @default(cuid())
   name          String // competitor title, e.g. "Warehouse & Logistics News"
   type          SourceType
   url           String
   active        Boolean    @default(true)
+  scanStatus    ScanStatus @default(IDLE)
   lastCheckedAt DateTime?
   lastResult    String? // human-readable summary of the last scan
   // URLs of issues/PDFs already processed, so we only handle new ones

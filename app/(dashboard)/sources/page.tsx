@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/table";
 import {
   SourceFormDialog, CheckNowButton, ActiveCheckbox, DeleteSourceButton,
-  DismissAlertButton, TYPE_OPTIONS,
+  DismissAlertButton,
 } from "@/components/sources/source-actions";
+import { TYPE_OPTIONS } from "@/lib/source-types";
+import { AgentHQ } from "@/components/agent-hq/agent-hq";
 
 export const dynamic = "force-dynamic";
 
@@ -27,14 +29,27 @@ export default async function SourcesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Watched Sources</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Agent HQ</h1>
           <p className="text-sm text-neutral-500">
-            The watcher checks these automatically every Monday morning and feeds new
-            advertisers into Competitor Intel.
+            Agent Intel patrols your competitor titles every Monday at 06:00 — or drag
+            him onto one to send him now. Everything he finds lands in Competitor Intel.
           </p>
         </div>
         <SourceFormDialog trigger={<Button>Watch new source</Button>} />
       </div>
+
+      <AgentHQ
+        initialSources={sources.map((s) => ({
+          id: s.id,
+          name: s.name,
+          type: s.type,
+          url: s.url,
+          active: s.active,
+          scanStatus: s.scanStatus,
+          lastCheckedAt: s.lastCheckedAt?.toISOString() ?? null,
+          lastResult: s.lastResult,
+        }))}
+      />
 
       {alerts.length > 0 && (
         <Card className="border-amber-300 bg-amber-50">
@@ -68,6 +83,11 @@ export default async function SourcesPage() {
         </Card>
       )}
 
+      <details>
+        <summary className="cursor-pointer text-sm font-medium text-neutral-500">
+          Manage sources ({sources.length})
+        </summary>
+        <div className="pt-3">
       <Table>
         <TableHeader>
           <TableRow>
@@ -120,6 +140,8 @@ export default async function SourcesPage() {
           ))}
         </TableBody>
       </Table>
+        </div>
+      </details>
     </div>
   );
 }

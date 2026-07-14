@@ -6,7 +6,7 @@ const nav = [
   { href: "/campaigns", label: "Campaigns" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/competitor-intel", label: "Competitor Intel" },
-  { href: "/sources", label: "Watched Sources" },
+  { href: "/sources", label: "Agent HQ" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

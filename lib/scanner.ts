@@ -197,6 +197,17 @@ export async function scanArchiveSource(source: WatchedSource) {
 }
 
 export async function scanSource(source: WatchedSource) {
-  if (source.type === "WEBSITE") return scanWebsiteSource(source);
-  return scanArchiveSource(source);
+  await db.watchedSource.update({
+    where: { id: source.id },
+    data: { scanStatus: "SCANNING" },
+  });
+  try {
+    if (source.type === "WEBSITE") return await scanWebsiteSource(source);
+    return await scanArchiveSource(source);
+  } finally {
+    await db.watchedSource.update({
+      where: { id: source.id },
+      data: { scanStatus: "IDLE" },
+    });
+  }
 }

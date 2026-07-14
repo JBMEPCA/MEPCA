@@ -12,11 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export const TYPE_OPTIONS = [
-  { value: "WEBSITE", label: "Website (banner ads)" },
-  { value: "PDF_ARCHIVE", label: "Magazine archive (PDF downloads)" },
-  { value: "FLIPBOOK", label: "Flipbook / digital edition (alert me)" },
-];
+import { TYPE_OPTIONS } from "@/lib/source-types";
 
 export type SourceFormValues = {
   id?: string;
