@@ -31,11 +31,24 @@ model Campaign {
   endDate     DateTime?
   status      CampaignStatus @default(UPCOMING)
   notes       String?
+  saleDate    DateTime? // when the booking was made (drives the Sales page)
+  issue       String? // which issue it runs in, e.g. "Dec 2023"
   fileMakerId String?        @unique // stable key so FileMaker re-imports update instead of duplicate
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   reminders FollowUpReminder[]
+}
+
+// Per-issue production deadlines parsed from the Deadlines spreadsheet
+model IssueDeadline {
+  id            String    @id @default(cuid())
+  issue         String    @unique // e.g. "February 2026"
+  issueDate     DateTime // first of the issue month, for sorting
+  salesDeadline DateTime?
+  adsDeadline   DateTime? // "100% ADS" — all ad content in hand
+  printDate     DateTime?
+  createdAt     DateTime  @default(now())
 }
 
 enum PipelineStage {
