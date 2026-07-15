@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import {
-  PipelineFormDialog, STAGE_OPTIONS,
-} from "@/components/pipeline/pipeline-form-dialog";
+import { PipelineFormDialog } from "@/components/pipeline/pipeline-form-dialog";
+import { STAGE_OPTIONS } from "@/lib/pipeline-stages";
 import {
   ConvertButton, DeletePipelineButton,
 } from "@/components/pipeline/pipeline-row-actions";
