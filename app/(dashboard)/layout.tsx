@@ -8,6 +8,7 @@ const nav = [
   { href: "/content", label: "Upcoming Content" },
   { href: "/pipeline", label: "Pipeline" },
   { href: "/sales", label: "Sales" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/competitor-intel", label: "Competitor Intel" },
 ];
 
@@ -24,9 +25,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             priority
             className="h-auto w-32"
           />
-          <div className="mt-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-primary/80">
-            Hub
-          </div>
         </div>
         <nav className="flex flex-col gap-1">
           {nav.map((item) => (

@@ -2,7 +2,7 @@ import { JWT } from "google-auth-library";
 
 // Shared Google service-account access (Calendar now; GA4/Search Console in milestone 2)
 
-function jwtClient(scopes: string[]) {
+export function jwtClient(scopes: string[]) {
   const email = process.env.GOOGLE_CLIENT_EMAIL;
   const key = process.env.GOOGLE_PRIVATE_KEY;
   if (!email || !key) return null;
