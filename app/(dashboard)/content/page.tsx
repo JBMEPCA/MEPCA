@@ -1,8 +1,9 @@
 import { db } from "@/lib/db";
-import { format } from "date-fns";
+import { format, isToday, isTomorrow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReceivedCheckbox } from "@/components/content/received-checkbox";
+import { listUpcomingEshots } from "@/lib/google";
 
 export const dynamic = "force-dynamic";
 
@@ -20,7 +21,7 @@ const shortIssue = (issue: string) => {
 export default async function ContentPage() {
   const now = new Date();
 
-  const [deadlines, liveBanners] = await Promise.all([
+  const [deadlines, liveBanners, eshotSchedule] = await Promise.all([
     db.issueDeadline.findMany({
       where: { adsDeadline: { gte: new Date(now.getTime() - 3 * 86400000) } },
       orderBy: { adsDeadline: "asc" },
@@ -33,6 +34,7 @@ export default async function ContentPage() {
       },
       orderBy: { endDate: "asc" },
     }),
+    listUpcomingEshots(42),
   ]);
 
   const issueGroups = await Promise.all(
@@ -126,10 +128,51 @@ export default async function ContentPage() {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        Coming soon: e-shot schedule synced from the Google Calendar (hooks into the same Google
-        setup as the Analytics milestone).
-      </p>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            E-shot send schedule
+            <span className="ml-3 text-sm font-normal text-muted-foreground">
+              next 6 weeks, live from Google Calendar
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {eshotSchedule === null ? (
+            <p className="text-sm text-muted-foreground">
+              Couldn&apos;t reach the calendar — check the Google credentials are set.
+            </p>
+          ) : eshotSchedule.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing scheduled in the next 6 weeks.</p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {eshotSchedule.map((e, i) => {
+                const days = Math.ceil((e.date.getTime() - now.getTime()) / 86400000);
+                const when = isToday(e.date)
+                  ? "today"
+                  : isTomorrow(e.date)
+                    ? "tomorrow"
+                    : format(e.date, "EEE d MMM");
+                return (
+                  <li key={i} className="flex items-center justify-between py-2 text-sm">
+                    <span className="flex items-center gap-3">
+                      <span
+                        className={`inline-block h-2 w-2 rounded-full ${
+                          days <= 2 ? "animate-pulse bg-amber-400" : "bg-cyan-500/60"
+                        }`}
+                      />
+                      <span className="font-medium">{e.title}</span>
+                    </span>
+                    <span className={days <= 2 ? "font-medium text-amber-300" : "text-muted-foreground"}>
+                      {when}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
