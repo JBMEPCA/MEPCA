@@ -1,5 +1,7 @@
-// MEPCA Hub — data model
+// Cogent Hub — data model
 // Plain-English guide:
+//   Magazine             = one of the five Cogent Multimedia titles; every
+//                          record below belongs to exactly one magazine
 //   Campaign             = a booked ad campaign (the tracker)
 //   PipelineItem         = a pitched campaign awaiting sign-off (the pipeline)
 //   FollowUpReminder     = a dated nudge attached to a pipeline item or campaign
@@ -16,6 +18,26 @@ datasource db {
   directUrl = env("DIRECT_URL") // session connection (port 5432) — used for migrations
 }
 
+// One of the five titles. The id IS the URL slug ("mepca", "hotel", "bar",
+// "care-home", "grooming") so pages can use route params directly as keys.
+// Display-only details (logo, brand colour, sector wording, WordPress env
+// keys) live in lib/magazines.ts — the DB row exists for FK integrity.
+model Magazine {
+  id        String  @id // slug, e.g. "mepca"
+  name      String // display name, e.g. "MEPCA"
+  siteUrl   String
+  sortOrder Int     @default(0)
+  active    Boolean @default(true)
+
+  campaigns             Campaign[]
+  pipelineItems         PipelineItem[]
+  issueDeadlines        IssueDeadline[]
+  watchedSources        WatchedSource[]
+  competitorAdvertisers CompetitorAdvertiser[]
+  monitoredTerms        MonitoredTerm[]
+  googleAdsLeads        GoogleAdsLead[]
+}
+
 enum CampaignStatus {
   UPCOMING
   LIVE
@@ -24,6 +46,8 @@ enum CampaignStatus {
 
 model Campaign {
   id          String         @id @default(cuid())
+  magazine    Magazine       @relation(fields: [magazineId], references: [id])
+  magazineId  String
   brand       String
   package     String // package/spec booked, e.g. "Full page + web banner"
   value       Decimal?       @db.Decimal(10, 2)
@@ -33,23 +57,32 @@ model Campaign {
   notes       String?
   saleDate    DateTime? // when the booking was made (drives the Sales page)
   issue       String? // which issue it runs in, e.g. "Dec 2023"
+  salesperson String? // who made the sale (from FileMaker's Sales Person column)
   contentReceived Boolean @default(false) // artwork/content in hand — the chase tick
-  fileMakerId String?        @unique // stable key so FileMaker re-imports update instead of duplicate
+  fileMakerId String? // stable key so FileMaker re-imports update instead of duplicate
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 
   reminders FollowUpReminder[]
+
+  // FileMaker record ids are only unique within one magazine's FileMaker file
+  @@unique([magazineId, fileMakerId])
+  @@index([magazineId])
 }
 
 // Per-issue production deadlines parsed from the Deadlines spreadsheet
 model IssueDeadline {
   id            String    @id @default(cuid())
-  issue         String    @unique // e.g. "February 2026"
+  magazine      Magazine  @relation(fields: [magazineId], references: [id])
+  magazineId    String
+  issue         String // e.g. "February 2026"
   issueDate     DateTime // first of the issue month, for sorting
   salesDeadline DateTime?
   adsDeadline   DateTime? // "100% ADS" — all ad content in hand
   printDate     DateTime?
   createdAt     DateTime  @default(now())
+
+  @@unique([magazineId, issue])
 }
 
 enum PipelineStage {
@@ -63,11 +96,14 @@ enum PipelineStage {
 
 model PipelineItem {
   id             String        @id @default(cuid())
+  magazine       Magazine      @relation(fields: [magazineId], references: [id])
+  magazineId     String
   brand          String
   package        String?
   estimatedValue Decimal?      @db.Decimal(10, 2)
   stage          PipelineStage @default(PITCHED)
   followUpDate   DateTime?
+  salesperson    String? // who owns the pitch
   notes          String?
   // set when the pitch is won and converted into a Campaign
   convertedCampaignId String?
@@ -75,6 +111,8 @@ model PipelineItem {
   updatedAt      DateTime      @updatedAt
 
   reminders FollowUpReminder[]
+
+  @@index([magazineId])
 }
 
 model FollowUpReminder {
@@ -107,6 +145,8 @@ enum ScanStatus {
 
 model WatchedSource {
   id            String     @id @default(cuid())
+  magazine      Magazine   @relation(fields: [magazineId], references: [id])
+  magazineId    String
   name          String // competitor title, e.g. "Warehouse & Logistics News"
   type          SourceType
   url           String
@@ -135,6 +175,8 @@ model SourceAlert {
 
 model CompetitorAdvertiser {
   id                 String   @id @default(cuid())
+  magazine           Magazine @relation(fields: [magazineId], references: [id])
+  magazineId         String
   brand              String
   competitorMagazine String
   adType             String?
@@ -145,7 +187,63 @@ model CompetitorAdvertiser {
   pitched            Boolean  @default(false) // already contacted / in pipeline
   // normalised "brand|magazine|adType" — lets spreadsheet re-imports update rows
   // instead of duplicating them
-  dedupeKey          String   @unique
+  dedupeKey          String
   firstSeenAt        DateTime @default(now())
   lastImportedAt     DateTime @default(now())
+
+  @@unique([magazineId, dedupeKey])
+}
+
+// ---------- Google Ads Leads ("Sniper" agent) ----------
+// A search term the Sniper agent googles (UK-targeted) to see who is paying
+// for Google Ads on it. Seeded from the WordPress CATEGORIES list.
+
+// Live state the Sniper HQ animation reads (mirrors ScanStatus for the spy)
+enum AdSearchStatus {
+  IDLE
+  QUEUED
+  SEARCHING
+}
+
+model MonitoredTerm {
+  id           String         @id @default(cuid())
+  magazine     Magazine       @relation(fields: [magazineId], references: [id])
+  magazineId   String
+  term         String // the Google query, e.g. "manufacturing software"
+  category     String? // WordPress category it was seeded from, if any
+  active       Boolean        @default(true)
+  searchStatus AdSearchStatus @default(IDLE)
+  lastCheckedAt DateTime?
+  lastResult   String? // human-readable summary of the last search
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  leads GoogleAdsLead[]
+
+  // two magazines may legitimately monitor the same term
+  @@unique([magazineId, term])
+}
+
+// A company caught running a Google Ad on one of the monitored terms —
+// a prospective advertiser for MEPCA to pitch.
+model GoogleAdsLead {
+  id            String   @id @default(cuid())
+  magazine      Magazine @relation(fields: [magazineId], references: [id])
+  magazineId    String
+  company       String // advertiser name (from the ad's displayed source)
+  website       String? // destination / displayed domain
+  adHeadline    String? // the ad's headline text
+  adDescription String? // the ad's body copy
+  term          MonitoredTerm @relation(fields: [termId], references: [id], onDelete: Cascade)
+  termId        String
+  searchTerm    String // denormalised term text, for display + filtering
+  goodTarget    Boolean  @default(false) // flagged by JB as worth pitching
+  pitched       Boolean  @default(false) // already contacted / in pipeline
+  // normalised "company|term" — one row per advertiser per term, updated on re-search
+  dedupeKey     String
+  timesSeen     Int      @default(1) // how many searches this advertiser has shown up in
+  firstSeenAt   DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+
+  @@unique([magazineId, dedupeKey])
 }

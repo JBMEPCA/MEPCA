@@ -8,6 +8,8 @@ import {
 import { CampaignFormDialog } from "@/components/campaigns/campaign-form-dialog";
 import { DeleteCampaignButton } from "@/components/campaigns/delete-campaign-button";
 import { FileMakerImportButton } from "@/components/campaigns/filemaker-import-button";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +22,22 @@ const statusStyles: Record<string, { label: string; className: string }> = {
 const gbp = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
 
 export default async function CampaignsPage({
+  params,
   searchParams,
 }: {
+  params: Promise<{ magazine: string }>;
   searchParams: Promise<{ q?: string }>;
 }) {
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
   const { q } = await searchParams;
 
   const campaigns = await db.campaign.findMany({
-    where: q ? { brand: { contains: q, mode: "insensitive" } } : undefined,
+    where: {
+      magazineId: mag.slug,
+      ...(q ? { brand: { contains: q, mode: "insensitive" } } : {}),
+    },
     orderBy: [{ startDate: "desc" }],
   });
 
@@ -63,7 +73,7 @@ export default async function CampaignsPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Campaigns</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Campaigns</h1>
           <p className="text-sm text-muted-foreground">
             {brandSummaries.length} brands · {campaigns.length} bookings ·{" "}
             <span className="text-primary">{gbp.format(liveValue)}</span>
@@ -71,12 +81,12 @@ export default async function CampaignsPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <FileMakerImportButton />
-          <CampaignFormDialog trigger={<Button>New campaign</Button>} />
+          <FileMakerImportButton magazine={mag.slug} />
+          <CampaignFormDialog magazine={mag.slug} trigger={<Button>New campaign</Button>} />
         </div>
       </div>
 
-      <form action="/campaigns">
+      <form action={`/${mag.slug}/campaigns`}>
         <input
           type="search"
           name="q"
@@ -142,6 +152,7 @@ export default async function CampaignsPage({
                           </TableCell>
                           <TableCell className="space-x-1 text-right">
                             <CampaignFormDialog
+                              magazine={mag.slug}
                               campaign={{
                                 id: c.id,
                                 brand: c.brand,
@@ -150,6 +161,7 @@ export default async function CampaignsPage({
                                 startDate: c.startDate ? format(c.startDate, "yyyy-MM-dd") : undefined,
                                 endDate: c.endDate ? format(c.endDate, "yyyy-MM-dd") : undefined,
                                 status: c.status,
+                                salesperson: c.salesperson ?? undefined,
                                 notes: c.notes ?? undefined,
                               }}
                               trigger={<Button variant="ghost" size="sm">Edit</Button>}

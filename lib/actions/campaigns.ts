@@ -16,25 +16,26 @@ function campaignDataFrom(formData: FormData) {
     startDate: str("startDate") ? new Date(str("startDate")!) : null,
     endDate: str("endDate") ? new Date(str("endDate")!) : null,
     status: (str("status") ?? "UPCOMING") as CampaignStatus,
+    salesperson: str("salesperson"),
     notes: str("notes"),
   };
 }
 
-export async function createCampaign(formData: FormData) {
+export async function createCampaign(magazineId: string, formData: FormData) {
   const data = campaignDataFrom(formData);
   if (!data.brand || !data.package) throw new Error("Brand and package are required");
-  await db.campaign.create({ data });
-  revalidatePath("/campaigns");
+  await db.campaign.create({ data: { ...data, magazineId } });
+  revalidatePath(`/${magazineId}/campaigns`);
 }
 
 export async function updateCampaign(id: string, formData: FormData) {
   const data = campaignDataFrom(formData);
   if (!data.brand || !data.package) throw new Error("Brand and package are required");
-  await db.campaign.update({ where: { id }, data });
-  revalidatePath("/campaigns");
+  const updated = await db.campaign.update({ where: { id }, data });
+  revalidatePath(`/${updated.magazineId}/campaigns`);
 }
 
 export async function deleteCampaign(id: string) {
-  await db.campaign.delete({ where: { id } });
-  revalidatePath("/campaigns");
+  const deleted = await db.campaign.delete({ where: { id } });
+  revalidatePath(`/${deleted.magazineId}/campaigns`);
 }

@@ -18,13 +18,16 @@ export type CampaignFormValues = {
   startDate?: string;
   endDate?: string;
   status?: string;
+  salesperson?: string;
   notes?: string;
 };
 
 export function CampaignFormDialog({
+  magazine,
   campaign,
   trigger,
 }: {
+  magazine: string;
   campaign?: CampaignFormValues;
   trigger: React.ReactElement;
 }) {
@@ -38,7 +41,7 @@ export function CampaignFormDialog({
       if (editing) {
         await updateCampaign(campaign!.id!, formData);
       } else {
-        await createCampaign(formData);
+        await createCampaign(magazine, formData);
       }
       setOpen(false);
     } finally {
@@ -86,6 +89,10 @@ export function CampaignFormDialog({
             <div className="space-y-1.5">
               <Label htmlFor="endDate">End date</Label>
               <Input id="endDate" name="endDate" type="date" defaultValue={campaign?.endDate} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="salesperson">Sales person</Label>
+              <Input id="salesperson" name="salesperson" defaultValue={campaign?.salesperson} />
             </div>
           </div>
           <div className="space-y-1.5">

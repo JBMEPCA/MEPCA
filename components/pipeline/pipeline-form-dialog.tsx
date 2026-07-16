@@ -18,13 +18,16 @@ export type PipelineFormValues = {
   estimatedValue?: string;
   stage?: string;
   followUpDate?: string;
+  salesperson?: string;
   notes?: string;
 };
 
 export function PipelineFormDialog({
+  magazine,
   item,
   trigger,
 }: {
+  magazine: string;
   item?: PipelineFormValues;
   trigger: React.ReactElement;
 }) {
@@ -38,7 +41,7 @@ export function PipelineFormDialog({
       if (editing) {
         await updatePipelineItem(item!.id!, formData);
       } else {
-        await createPipelineItem(formData);
+        await createPipelineItem(magazine, formData);
       }
       setOpen(false);
     } finally {
@@ -83,6 +86,10 @@ export function PipelineFormDialog({
               <Label htmlFor="followUpDate">Follow up on</Label>
               <Input id="followUpDate" name="followUpDate" type="date"
                 defaultValue={item?.followUpDate} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="salesperson">Sales person</Label>
+              <Input id="salesperson" name="salesperson" defaultValue={item?.salesperson} />
             </div>
           </div>
           <div className="space-y-1.5">

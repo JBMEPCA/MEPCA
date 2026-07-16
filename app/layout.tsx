@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MEPCA Hub",
-  description: "Commercial and editorial dashboard for MEPCA Magazine",
+  title: "Cogent Hub",
+  description: "Commercial and editorial dashboard for Cogent Multimedia's magazines",
 };
 
 export default function RootLayout({

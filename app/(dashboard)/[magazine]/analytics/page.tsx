@@ -3,6 +3,9 @@ import { TrafficChart } from "@/components/analytics/traffic-chart";
 import {
   trafficOverview, dailySessions, topPages, trafficChannels, searchOverview, topQueries,
 } from "@/lib/analytics";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
+import { NotSetUpYet } from "@/components/not-set-up-yet";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -26,7 +29,26 @@ function fmtDuration(seconds: number) {
   return `${m}m ${s}s`;
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  params,
+}: {
+  params: Promise<{ magazine: string }>;
+}) {
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
+
+  // Google Analytics + Search Console are only wired up for MEPCA so far.
+  if (mag.slug !== "mepca") {
+    return (
+      <NotSetUpYet
+        title={`${mag.shortName} Analytics`}
+        what={`Google Analytics and Search Console for ${mag.name}`}
+        need="access to the site's Google Analytics property and Search Console"
+      />
+    );
+  }
+
   let data;
   try {
     const [overview, daily, pages, channels, search, queries] = await Promise.all([
@@ -56,9 +78,9 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Analytics</h1>
         <p className="text-sm text-muted-foreground">
-          mepca-engineering.com — last 28 days vs the 28 before, live from Google.
+          {mag.siteUrl.replace(/^https?:\/\//, "")} — last 28 days vs the 28 before, live from Google.
         </p>
       </div>
 
@@ -107,7 +129,7 @@ export default async function AnalyticsPage() {
               {pages.map((p) => (
                 <li key={p.path} className="flex items-center justify-between gap-4 py-2 text-sm">
                   <a
-                    href={`https://mepca-engineering.com${p.path}`}
+                    href={`${mag.siteUrl}${p.path}`}
                     target="_blank"
                     rel="noreferrer"
                     className="min-w-0 truncate hover:text-primary hover:underline"

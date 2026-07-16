@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReceivedCheckbox } from "@/components/content/received-checkbox";
 import { listUpcomingEshots } from "@/lib/google";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
 
@@ -18,29 +20,42 @@ const shortIssue = (issue: string) => {
   return `${month.slice(0, 3)} ${year}`;
 };
 
-export default async function ContentPage() {
+export default async function ContentPage({
+  params,
+}: {
+  params: Promise<{ magazine: string }>;
+}) {
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
+
   const now = new Date();
 
   const [deadlines, liveBanners, eshotSchedule] = await Promise.all([
     db.issueDeadline.findMany({
-      where: { adsDeadline: { gte: new Date(now.getTime() - 3 * 86400000) } },
+      where: {
+        magazineId: mag.slug,
+        adsDeadline: { gte: new Date(now.getTime() - 3 * 86400000) },
+      },
       orderBy: { adsDeadline: "asc" },
       take: 3,
     }),
     db.campaign.findMany({
       where: {
+        magazineId: mag.slug,
         startDate: { lte: now },
         endDate: { gte: now },
       },
       orderBy: { endDate: "asc" },
     }),
-    listUpcomingEshots(42),
+    // The e-shot calendar is MEPCA's Google Calendar; other titles get theirs later
+    mag.slug === "mepca" ? listUpcomingEshots(42) : Promise.resolve(null),
   ]);
 
   const issueGroups = await Promise.all(
     deadlines.map(async (d) => {
       const bookings = await db.campaign.findMany({
-        where: { issue: shortIssue(d.issue) },
+        where: { magazineId: mag.slug, issue: shortIssue(d.issue) },
         orderBy: [{ contentReceived: "asc" }, { brand: "asc" }],
       });
       return { deadline: d, bookings };
@@ -52,7 +67,7 @@ export default async function ContentPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Upcoming Content</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} — Upcoming Content</h1>
         <p className="text-sm text-muted-foreground">
           Everything due in the next issues — tick each item off as the content arrives.
         </p>
@@ -140,7 +155,9 @@ export default async function ContentPage() {
         <CardContent>
           {eshotSchedule === null ? (
             <p className="text-sm text-muted-foreground">
-              Couldn&apos;t reach the calendar — check the Google credentials are set.
+              {mag.slug === "mepca"
+                ? "Couldn't reach the calendar — check the Google credentials are set."
+                : `${mag.shortName}'s e-shot calendar isn't connected yet.`}
             </p>
           ) : eshotSchedule.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing scheduled in the next 6 weeks.</p>

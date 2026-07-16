@@ -22,9 +22,11 @@ export type SourceFormValues = {
 };
 
 export function SourceFormDialog({
+  magazine,
   source,
   trigger,
 }: {
+  magazine: string;
   source?: SourceFormValues;
   trigger: React.ReactElement;
 }) {
@@ -38,7 +40,7 @@ export function SourceFormDialog({
       if (editing) {
         await updateSource(source!.id!, formData);
       } else {
-        await createSource(formData);
+        await createSource(magazine, formData);
       }
       setOpen(false);
     } finally {

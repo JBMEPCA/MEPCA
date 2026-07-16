@@ -1,6 +1,14 @@
 import { db } from "@/lib/db";
 import type { WatchedSource } from "@prisma/client";
 import { classifyWebsiteAds, scanPdfForAdvertisers, type FoundAdvertiser } from "@/lib/ai";
+import { getMagazine } from "@/lib/magazines";
+
+// "MEPCA Magazine (UK manufacturing…)" — tells Claude which of our titles the
+// leads are for, so it judges relevance against the right sector.
+function clientLineFor(magazineId: string) {
+  const mag = getMagazine(magazineId);
+  return mag ? `${mag.name} (${mag.sector})` : "one of our trade magazines";
+}
 
 // Raw PDF must stay well under the API's 32MB request cap once base64-encoded (+33%)
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
@@ -53,6 +61,7 @@ function dedupeKeyFor(brand: string, magazine: string, adType: string | null) {
 
 async function upsertAdvertisers(
   found: FoundAdvertiser[],
+  magazineId: string,
   magazineName: string,
   sourceLabel: string
 ) {
@@ -63,8 +72,9 @@ async function upsertAdvertisers(
     if (!brand) continue;
     const key = dedupeKeyFor(brand, magazineName, ad.adType || null);
     await db.competitorAdvertiser.upsert({
-      where: { dedupeKey: key },
+      where: { magazineId_dedupeKey: { magazineId, dedupeKey: key } },
       create: {
+        magazineId,
         brand,
         competitorMagazine: magazineName,
         adType: ad.adType || null,
@@ -91,8 +101,12 @@ export async function scanWebsiteSource(source: WatchedSource) {
   const html = await res.text();
 
   const candidates = extractAdCandidates(html, source.url);
-  const found = await classifyWebsiteAds(source.name, source.url, candidates);
-  const upserted = await upsertAdvertisers(found, source.name, new URL(source.url).hostname);
+  const found = await classifyWebsiteAds(
+    source.name, source.url, candidates, clientLineFor(source.magazineId)
+  );
+  const upserted = await upsertAdvertisers(
+    found, source.magazineId, source.name, new URL(source.url).hostname
+  );
 
   const result = `Scanned ${candidates.length} placements, found ${upserted} advertisers`;
   await db.watchedSource.update({
@@ -176,8 +190,10 @@ export async function scanArchiveSource(source: WatchedSource) {
         alerted++;
         continue;
       }
-      const found = await scanPdfForAdvertisers(source.name, buffer.toString("base64"));
-      await upsertAdvertisers(found, source.name, pdfUrl);
+      const found = await scanPdfForAdvertisers(
+        source.name, buffer.toString("base64"), clientLineFor(source.magazineId)
+      );
+      await upsertAdvertisers(found, source.magazineId, source.name, pdfUrl);
       processed++;
     }
     result = newLinks.length

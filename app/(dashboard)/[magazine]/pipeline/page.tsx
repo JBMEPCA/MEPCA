@@ -10,6 +10,8 @@ import { STAGE_OPTIONS } from "@/lib/pipeline-stages";
 import {
   ConvertButton, DeletePipelineButton,
 } from "@/components/pipeline/pipeline-row-actions";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +26,17 @@ const stageBadge: Record<string, string> = {
   LOST: "bg-red-500/15 text-red-400 hover:bg-red-500/15",
 };
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  params,
+}: {
+  params: Promise<{ magazine: string }>;
+}) {
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
+
   const items = await db.pipelineItem.findMany({
+    where: { magazineId: mag.slug },
     orderBy: [{ followUpDate: "asc" }, { updatedAt: "desc" }],
   });
 
@@ -37,15 +48,15 @@ export default async function PipelinePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Pipeline</h1>
           <p className="text-sm text-muted-foreground">
             {open.length} open pitches worth {gbp.format(openValue)}
           </p>
         </div>
-        <PipelineFormDialog trigger={<Button>New pitch</Button>} />
+        <PipelineFormDialog magazine={mag.slug} trigger={<Button>New pitch</Button>} />
       </div>
 
-      <PipelineTable items={open} emptyMessage="No open pitches. Add one, or pick a target from Competitor Intel." />
+      <PipelineTable magazine={mag.slug} items={open} emptyMessage="No open pitches. Add one, or pick a target from Competitor Intel." />
 
       {closed.length > 0 && (
         <details className="pt-4">
@@ -53,7 +64,7 @@ export default async function PipelinePage() {
             Closed ({closed.length})
           </summary>
           <div className="pt-3">
-            <PipelineTable items={closed} emptyMessage="" />
+            <PipelineTable magazine={mag.slug} items={closed} emptyMessage="" />
           </div>
         </details>
       )}
@@ -63,7 +74,11 @@ export default async function PipelinePage() {
 
 type Item = Awaited<ReturnType<typeof db.pipelineItem.findMany>>[number];
 
-function PipelineTable({ items, emptyMessage }: { items: Item[]; emptyMessage: string }) {
+function PipelineTable({
+  magazine, items, emptyMessage,
+}: {
+  magazine: string; items: Item[]; emptyMessage: string;
+}) {
   return (
     <Table>
       <TableHeader>
@@ -110,6 +125,7 @@ function PipelineTable({ items, emptyMessage }: { items: Item[]; emptyMessage: s
               <TableCell className="space-x-1 text-right">
                 {isOpen && <ConvertButton id={item.id} brand={item.brand} />}
                 <PipelineFormDialog
+                  magazine={magazine}
                   item={{
                     id: item.id,
                     brand: item.brand,
@@ -119,6 +135,7 @@ function PipelineTable({ items, emptyMessage }: { items: Item[]; emptyMessage: s
                     followUpDate: item.followUpDate
                       ? format(item.followUpDate, "yyyy-MM-dd")
                       : undefined,
+                    salesperson: item.salesperson ?? undefined,
                     notes: item.notes ?? undefined,
                   }}
                   trigger={<Button variant="ghost" size="sm">Edit</Button>}

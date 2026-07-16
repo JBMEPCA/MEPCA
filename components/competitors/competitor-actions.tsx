@@ -7,7 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 
-export function CompetitorSheetUpload() {
+export function CompetitorSheetUpload({ magazine }: { magazine: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -18,7 +18,7 @@ export function CompetitorSheetUpload() {
     try {
       const formData = new FormData();
       formData.set("file", file);
-      const r = await importCompetitorSheet(formData);
+      const r = await importCompetitorSheet(magazine, formData);
       setResult(`Synced ${r.imported} advertisers${r.skipped ? ` (${r.skipped} rows skipped)` : ""}`);
     } catch (e) {
       setResult(e instanceof Error ? e.message : "Import failed");

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { importFileMakerCsv } from "@/lib/actions/filemaker";
 import { Button } from "@/components/ui/button";
 
-export function FileMakerImportButton() {
+export function FileMakerImportButton({ magazine }: { magazine: string }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<string | null>(null);
@@ -15,7 +15,7 @@ export function FileMakerImportButton() {
     try {
       const formData = new FormData();
       formData.set("file", file);
-      const r = await importFileMakerCsv(formData);
+      const r = await importFileMakerCsv(magazine, formData);
       let msg = `Imported: ${r.created} new, ${r.updated} updated`;
       if (r.skipped) msg += `, ${r.skipped} skipped (no brand)`;
       if (r.unmappedHeaders.length) msg += `. Columns not recognised: ${r.unmappedHeaders.join(", ")}`;

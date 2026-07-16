@@ -17,45 +17,47 @@ function sourceDataFrom(formData: FormData) {
   };
 }
 
-export async function createSource(formData: FormData) {
+const intelPath = (magazineId: string) => `/${magazineId}/competitor-intel`;
+
+export async function createSource(magazineId: string, formData: FormData) {
   const data = sourceDataFrom(formData);
   if (!data.name || !data.url) throw new Error("Name and URL are required");
-  await db.watchedSource.create({ data });
-  revalidatePath("/sources");
+  await db.watchedSource.create({ data: { ...data, magazineId } });
+  revalidatePath(intelPath(magazineId));
 }
 
 export async function updateSource(id: string, formData: FormData) {
   const data = sourceDataFrom(formData);
   if (!data.name || !data.url) throw new Error("Name and URL are required");
-  await db.watchedSource.update({ where: { id }, data });
-  revalidatePath("/sources");
+  const updated = await db.watchedSource.update({ where: { id }, data });
+  revalidatePath(intelPath(updated.magazineId));
 }
 
 export async function toggleSourceActive(id: string, active: boolean) {
-  await db.watchedSource.update({ where: { id }, data: { active } });
-  revalidatePath("/sources");
+  const updated = await db.watchedSource.update({ where: { id }, data: { active } });
+  revalidatePath(intelPath(updated.magazineId));
 }
 
 export async function deleteSource(id: string) {
-  await db.watchedSource.delete({ where: { id } });
-  revalidatePath("/sources");
+  const deleted = await db.watchedSource.delete({ where: { id } });
+  revalidatePath(intelPath(deleted.magazineId));
 }
 
 // Fires the Inngest event; the scan runs in the background and the page
 // shows the result under "Last result" once it finishes
 export async function requestScan(id: string) {
-  await db.watchedSource.update({
+  const updated = await db.watchedSource.update({
     where: { id },
     data: { lastResult: "Scan queued…", scanStatus: "QUEUED" },
   });
   await inngest.send({ name: "sources/scan.requested", data: { sourceId: id } });
-  revalidatePath("/sources");
+  revalidatePath(intelPath(updated.magazineId));
 }
 
 // Agent HQ drag-drop: scan every source belonging to one competitor title
-export async function requestScanForTitle(name: string) {
+export async function requestScanForTitle(magazineId: string, name: string) {
   const sources = await db.watchedSource.findMany({
-    where: { name, active: true },
+    where: { magazineId, name, active: true },
   });
   for (const source of sources) {
     await db.watchedSource.update({
@@ -67,10 +69,14 @@ export async function requestScanForTitle(name: string) {
       data: { sourceId: source.id },
     });
   }
-  revalidatePath("/sources");
+  revalidatePath(intelPath(magazineId));
 }
 
 export async function dismissAlert(id: string) {
-  await db.sourceAlert.update({ where: { id }, data: { dismissed: true } });
-  revalidatePath("/sources");
+  const alert = await db.sourceAlert.update({
+    where: { id },
+    data: { dismissed: true },
+    include: { source: { select: { magazineId: true } } },
+  });
+  revalidatePath(intelPath(alert.source.magazineId));
 }

@@ -44,17 +44,20 @@ const advertiserSchema = {
   additionalProperties: false,
 };
 
-const HOUSE_AD_RULES = `Rules for what counts as an advertiser:
-- Only genuine THIRD-PARTY companies paying to advertise. These are prospective ad clients for MEPCA Magazine (UK manufacturing/engineering/logistics trade title).
+// clientLine describes which of our magazines the leads are FOR,
+// e.g. "MEPCA Magazine (UK manufacturing, engineering and process control trade title)"
+const houseAdRules = (clientLine: string) => `Rules for what counts as an advertiser:
+- Only genuine THIRD-PARTY companies paying to advertise. These are prospective ad clients for ${clientLine}.
 - EXCLUDE house ads: the publisher promoting its own magazines, newsletters, subscriptions, media packs, events, awards, webinars, or sister titles.
 - EXCLUDE editorial mentions, article sponsors' logos inside editorial, navigation links, social media buttons, and stock/ad-network placeholder ads (Google AdSense generics etc.).
-- INCLUDE branded banners, display ads, sponsored content clearly paid for by an industrial/manufacturing/logistics company.
+- INCLUDE branded banners, display ads, sponsored content clearly paid for by a company in the sector.
 - Normalise brand names (e.g. "SICK Sensor Intelligence" -> "SICK").`;
 
 export async function classifyWebsiteAds(
   siteName: string,
   pageUrl: string,
-  candidates: { href: string; imgSrc: string; alt: string }[]
+  candidates: { href: string; imgSrc: string; alt: string }[],
+  clientLine: string
 ): Promise<FoundAdvertiser[]> {
   if (candidates.length === 0) return [];
 
@@ -72,7 +75,7 @@ export async function classifyWebsiteAds(
         role: "user",
         content: `You are scanning the website of "${siteName}" (${pageUrl}), a competitor trade magazine, for display/banner advertisers.
 
-${HOUSE_AD_RULES}
+${houseAdRules(clientLine)}
 
 Below are the candidate ad placements extracted from the page (linked images and embeds). Identify which are genuine third-party advertisers. Use the link destination domain and alt text to identify the brand. Deduplicate brands.
 
@@ -86,7 +89,8 @@ ${candidateList}`,
 
 export async function scanPdfForAdvertisers(
   magazineName: string,
-  pdfBase64: string
+  pdfBase64: string,
+  clientLine: string
 ): Promise<FoundAdvertiser[]> {
   // Magazine PDFs are large — stream to avoid HTTP timeouts
   const stream = client().messages.stream({
@@ -106,7 +110,7 @@ export async function scanPdfForAdvertisers(
             type: "text",
             text: `This is an issue of "${magazineName}", a competitor trade magazine. Go through every page and list all third-party display advertisers (full page, half page, quarter page ads etc.).
 
-${HOUSE_AD_RULES}
+${houseAdRules(clientLine)}
 
 For whereFound, give the page number. Deduplicate brands (one entry per brand, note multiple placements in whereFound).`,
           },

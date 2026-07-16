@@ -18,6 +18,7 @@ const HEADER_SYNONYMS: Record<string, string[]> = {
   startDate: ["start date", "start", "from", "live date", "issue date"],
   endDate: ["end date", "end", "to", "finish", "expiry"],
   status: ["status", "state"],
+  salesperson: ["sales person", "salesperson", "sold by", "rep", "sales rep", "account manager"],
   notes: ["notes", "comments", "remarks"],
 };
 
@@ -64,7 +65,7 @@ function parseDate(raw: unknown): Date | null {
   return isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export async function importFileMakerCsv(formData: FormData) {
+export async function importFileMakerCsv(magazineId: string, formData: FormData) {
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file uploaded");
 
@@ -98,35 +99,39 @@ export async function importFileMakerCsv(formData: FormData) {
       startDate: parseDate(map.startDate ? row[map.startDate] : null),
       endDate: parseDate(map.endDate ? row[map.endDate] : null),
       status: parseStatus(get(row, "status")) ?? "COMPLETED",
+      salesperson: get(row, "salesperson") || null,
       notes: get(row, "notes") || null,
     };
 
     const fileMakerId = get(row, "fileMakerId") || null;
     if (fileMakerId) {
-      const existing = await db.campaign.findUnique({ where: { fileMakerId } });
-      if (existing) {
-        await db.campaign.update({ where: { fileMakerId }, data });
-        updated++;
-      } else {
-        await db.campaign.create({ data: { ...data, fileMakerId } });
-        created++;
-      }
-    } else {
-      // No stable ID — fall back to brand + start date to avoid duplicates
-      const existing = await db.campaign.findFirst({
-        where: { brand, startDate: data.startDate },
+      // FileMaker ids are only stable within one magazine's file
+      const existing = await db.campaign.findUnique({
+        where: { magazineId_fileMakerId: { magazineId, fileMakerId } },
       });
       if (existing) {
         await db.campaign.update({ where: { id: existing.id }, data });
         updated++;
       } else {
-        await db.campaign.create({ data });
+        await db.campaign.create({ data: { ...data, magazineId, fileMakerId } });
+        created++;
+      }
+    } else {
+      // No stable ID — fall back to brand + start date to avoid duplicates
+      const existing = await db.campaign.findFirst({
+        where: { magazineId, brand, startDate: data.startDate },
+      });
+      if (existing) {
+        await db.campaign.update({ where: { id: existing.id }, data });
+        updated++;
+      } else {
+        await db.campaign.create({ data: { ...data, magazineId } });
         created++;
       }
     }
   }
 
-  revalidatePath("/campaigns");
+  revalidatePath(`/${magazineId}/campaigns`);
   const unmappedHeaders = headers.filter((h) => !Object.values(map).includes(h));
   return { created, updated, skipped, unmappedHeaders };
 }

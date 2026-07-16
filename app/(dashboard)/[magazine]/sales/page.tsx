@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SalesChart, type MonthlySales } from "@/components/sales/sales-chart";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +13,17 @@ const gbp = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-export default async function SalesPage() {
+export default async function SalesPage({
+  params,
+}: {
+  params: Promise<{ magazine: string }>;
+}) {
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
+
   const campaigns = await db.campaign.findMany({
-    where: { startDate: { not: null } },
+    where: { magazineId: mag.slug, startDate: { not: null } },
     select: {
       startDate: true, saleDate: true, value: true, brand: true, package: true, issue: true,
     },
@@ -68,7 +78,7 @@ export default async function SalesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Sales</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Sales</h1>
         <p className="text-sm text-muted-foreground">
           Revenue by issue — including issues still to come. Purple bars are the future.
         </p>

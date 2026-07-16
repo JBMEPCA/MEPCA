@@ -17,18 +17,26 @@ import {
 import { TYPE_OPTIONS } from "@/lib/source-types";
 import { AgentHQ } from "@/components/agent-hq/agent-hq";
 import type { Prisma } from "@prisma/client";
+import { notFound } from "next/navigation";
+import { getMagazine } from "@/lib/magazines";
 
 export const dynamic = "force-dynamic";
 
 export default async function CompetitorIntelPage({
+  params,
   searchParams,
 }: {
-  searchParams: Promise<{ magazine?: string; q?: string; targets?: string; fresh?: string }>;
+  params: Promise<{ magazine: string }>;
+  // seenIn = competitor title filter (was "magazine" before the Cogent restructure)
+  searchParams: Promise<{ seenIn?: string; q?: string; targets?: string; fresh?: string }>;
 }) {
-  const { magazine, q, targets, fresh } = await searchParams;
+  const { magazine } = await params;
+  const mag = getMagazine(magazine);
+  if (!mag) notFound();
+  const { seenIn, q, targets, fresh } = await searchParams;
 
-  const where: Prisma.CompetitorAdvertiserWhereInput = {};
-  if (magazine) where.competitorMagazine = magazine;
+  const where: Prisma.CompetitorAdvertiserWhereInput = { magazineId: mag.slug };
+  if (seenIn) where.competitorMagazine = seenIn;
   if (q) where.brand = { contains: q, mode: "insensitive" };
   if (targets === "1") where.goodTarget = true;
   if (fresh === "1") {
@@ -39,31 +47,33 @@ export default async function CompetitorIntelPage({
     db.competitorAdvertiser.findMany({ where, orderBy: { brand: "asc" }, take: 500 }),
     db.competitorAdvertiser.groupBy({
       by: ["competitorMagazine"],
+      where: { magazineId: mag.slug },
       _count: true,
       orderBy: { _count: { competitorMagazine: "desc" } },
     }),
-    db.competitorAdvertiser.count(),
-    db.watchedSource.findMany({ orderBy: { name: "asc" } }),
+    db.competitorAdvertiser.count({ where: { magazineId: mag.slug } }),
+    db.watchedSource.findMany({ where: { magazineId: mag.slug }, orderBy: { name: "asc" } }),
     db.sourceAlert.findMany({
-      where: { dismissed: false },
+      where: { dismissed: false, source: { magazineId: mag.slug } },
       orderBy: { createdAt: "desc" },
     }),
   ]);
 
+  const basePath = `/${mag.slug}/competitor-intel`;
   const filterLink = (params: Record<string, string | undefined>) => {
-    const merged = { magazine, q, targets, fresh, ...params };
+    const merged = { seenIn, q, targets, fresh, ...params };
     const qs = Object.entries(merged)
       .filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
       .join("&");
-    return qs ? `/competitor-intel?${qs}` : "/competitor-intel";
+    return qs ? `${basePath}?${qs}` : basePath;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Competitor Intel</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} — Competitor Intel</h1>
           <p className="text-sm text-muted-foreground">
             Agent Intel patrols {watchedSources.filter((s) => s.active).length} competitor
             sources every Monday at 06:00 — drag him onto a title to send him now.
@@ -71,12 +81,13 @@ export default async function CompetitorIntelPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <CompetitorSheetUpload />
-          <SourceFormDialog trigger={<Button variant="outline">Watch new source</Button>} />
+          <CompetitorSheetUpload magazine={mag.slug} />
+          <SourceFormDialog magazine={mag.slug} trigger={<Button variant="outline">Watch new source</Button>} />
         </div>
       </div>
 
       <AgentHQ
+        magazine={mag.slug}
         initialSources={watchedSources.map((s) => ({
           id: s.id,
           name: s.name,
@@ -129,20 +140,20 @@ export default async function CompetitorIntelPage({
           <Badge variant={fresh === "1" ? "default" : "outline"}>New this week</Badge>
         </Link>
         <span className="mx-1 text-muted-foreground">|</span>
-        <Link href={filterLink({ magazine: undefined })}>
-          <Badge variant={!magazine ? "default" : "outline"}>All titles</Badge>
+        <Link href={filterLink({ seenIn: undefined })}>
+          <Badge variant={!seenIn ? "default" : "outline"}>All titles</Badge>
         </Link>
         {magazines.map((m) => (
-          <Link key={m.competitorMagazine} href={filterLink({ magazine: m.competitorMagazine })}>
-            <Badge variant={magazine === m.competitorMagazine ? "default" : "outline"}>
+          <Link key={m.competitorMagazine} href={filterLink({ seenIn: m.competitorMagazine })}>
+            <Badge variant={seenIn === m.competitorMagazine ? "default" : "outline"}>
               {m.competitorMagazine} ({m._count})
             </Badge>
           </Link>
         ))}
       </div>
 
-      <form action="/competitor-intel" className="flex gap-2">
-        {magazine && <input type="hidden" name="magazine" value={magazine} />}
+      <form action={basePath} className="flex gap-2">
+        {seenIn && <input type="hidden" name="seenIn" value={seenIn} />}
         {targets && <input type="hidden" name="targets" value={targets} />}
         {fresh && <input type="hidden" name="fresh" value={fresh} />}
         <input
@@ -171,7 +182,7 @@ export default async function CompetitorIntelPage({
             <TableRow>
               <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                 {total === 0
-                  ? "No data yet — click Sync spreadsheet and upload MEPCA_Competitor_Advertisers_Pilot.xlsx."
+                  ? "No data yet — upload a competitor advertisers spreadsheet, or watch a source and send Agent Intel in."
                   : "Nothing matches the current filters."}
               </TableCell>
             </TableRow>
@@ -246,6 +257,7 @@ export default async function CompetitorIntelPage({
                   <TableCell className="space-x-1 text-right">
                     <CheckNowButton id={s.id} />
                     <SourceFormDialog
+                      magazine={mag.slug}
                       source={{ id: s.id, name: s.name, type: s.type, url: s.url }}
                       trigger={<Button variant="ghost" size="sm">Edit</Button>}
                     />

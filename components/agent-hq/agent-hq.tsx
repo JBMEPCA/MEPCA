@@ -41,7 +41,13 @@ function groupByTitle(sources: SourceStatus[]): Title[] {
   });
 }
 
-export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) {
+export function AgentHQ({
+  magazine,
+  initialSources,
+}: {
+  magazine: string;
+  initialSources: SourceStatus[];
+}) {
   const [sources, setSources] = useState(initialSources);
   const [report, setReport] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -63,7 +69,7 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
     let stop = false;
     async function tick() {
       try {
-        const res = await fetch("/api/agent-status");
+        const res = await fetch(`/api/agent-status?magazine=${encodeURIComponent(magazine)}`);
         if (res.ok && !stop) {
           const data = await res.json();
           setSources(data.sources);
@@ -76,7 +82,7 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
       stop = true;
       clearInterval(interval);
     };
-  }, [sources]);
+  }, [sources, magazine]);
 
   // When a title finishes scanning, have the spy report what he found
   useEffect(() => {
@@ -161,7 +167,7 @@ export function AgentHQ({ initialSources }: { initialSources: SourceStatus[] }) 
         setSources((prev) =>
           prev.map((s) => (s.name === name ? { ...s, scanStatus: "QUEUED" } : s))
         );
-        await requestScanForTitle(name);
+        await requestScanForTitle(magazine, name);
       }
     }
 

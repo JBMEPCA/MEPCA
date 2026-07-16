@@ -20,7 +20,7 @@ function dedupeKeyFor(brand: string, magazine: string, adType: string | null) {
   return [brand, magazine, adType ?? ""].map((s) => s.toLowerCase().trim()).join("|");
 }
 
-export async function importCompetitorSheet(formData: FormData) {
+export async function importCompetitorSheet(magazineId: string, formData: FormData) {
   const file = formData.get("file");
   if (!(file instanceof File)) throw new Error("No file uploaded");
 
@@ -42,17 +42,19 @@ export async function importCompetitorSheet(formData: FormData) {
       continue;
     }
     const adType = row["Ad Type"]?.toString().trim() || null;
+    const dedupeKey = dedupeKeyFor(brand, magazine, adType);
 
     await db.competitorAdvertiser.upsert({
-      where: { dedupeKey: dedupeKeyFor(brand, magazine, adType) },
+      where: { magazineId_dedupeKey: { magazineId, dedupeKey } },
       create: {
+        magazineId,
         brand,
         competitorMagazine: magazine,
         adType,
         whereFound: row["Where Found"]?.toString().trim() || null,
         confidenceNotes: row["Confidence / Notes"]?.toString().trim() || null,
         source: row.Source?.toString().trim() || null,
-        dedupeKey: dedupeKeyFor(brand, magazine, adType),
+        dedupeKey,
         lastImportedAt: now,
       },
       update: {
@@ -65,18 +67,24 @@ export async function importCompetitorSheet(formData: FormData) {
     imported++;
   }
 
-  revalidatePath("/competitor-intel");
+  revalidatePath(`/${magazineId}/competitor-intel`);
   return { imported, skipped };
 }
 
 export async function toggleGoodTarget(id: string, value: boolean) {
-  await db.competitorAdvertiser.update({ where: { id }, data: { goodTarget: value } });
-  revalidatePath("/competitor-intel");
+  const updated = await db.competitorAdvertiser.update({
+    where: { id },
+    data: { goodTarget: value },
+  });
+  revalidatePath(`/${updated.magazineId}/competitor-intel`);
 }
 
 export async function togglePitched(id: string, value: boolean) {
-  await db.competitorAdvertiser.update({ where: { id }, data: { pitched: value } });
-  revalidatePath("/competitor-intel");
+  const updated = await db.competitorAdvertiser.update({
+    where: { id },
+    data: { pitched: value },
+  });
+  revalidatePath(`/${updated.magazineId}/competitor-intel`);
 }
 
 // One-click handoff: turn a flagged competitor advertiser into a pipeline pitch
@@ -84,12 +92,13 @@ export async function addToPipeline(id: string) {
   const advertiser = await db.competitorAdvertiser.findUniqueOrThrow({ where: { id } });
   await db.pipelineItem.create({
     data: {
+      magazineId: advertiser.magazineId,
       brand: advertiser.brand,
       notes: `From competitor intel: seen in ${advertiser.competitorMagazine}` +
         (advertiser.adType ? ` (${advertiser.adType})` : ""),
     },
   });
   await db.competitorAdvertiser.update({ where: { id }, data: { pitched: true } });
-  revalidatePath("/competitor-intel");
-  revalidatePath("/pipeline");
+  revalidatePath(`/${advertiser.magazineId}/competitor-intel`);
+  revalidatePath(`/${advertiser.magazineId}/pipeline`);
 }
