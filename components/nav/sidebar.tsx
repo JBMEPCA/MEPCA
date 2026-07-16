@@ -59,17 +59,19 @@ export function Sidebar() {
                 <button
                   type="button"
                   onClick={() => setToggled((t) => ({ ...t, [mag.slug]: !open }))}
-                  className="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm font-semibold transition-colors hover:bg-accent"
+                  className="flex h-12 w-full items-center justify-between rounded-md px-3 text-sm font-semibold transition-colors hover:bg-accent"
                   style={{ color: mag.brandColor }}
                 >
-                  <span className="flex items-center gap-2">
+                  {/* Fixed-size box + object-contain = every logo renders the same
+                      height; brightness-0 invert = every logo renders white. */}
+                  <span className="relative block h-7 w-28">
                     {mag.logo ? (
                       <Image
                         src={mag.logo}
                         alt={mag.name}
-                        width={90}
-                        height={26}
-                        className={`h-auto w-20 ${mag.logoNeedsInvert ? "brightness-0 invert" : ""}`}
+                        fill
+                        sizes="112px"
+                        className="object-contain object-left brightness-0 invert"
                       />
                     ) : (
                       mag.name

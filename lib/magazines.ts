@@ -16,7 +16,8 @@ export type MagazineConfig = {
   // competitor-ad classification, WordPress drafting).
   sector: string;
   logo: string | null; // path under /public, when we have one
-  logoNeedsInvert?: boolean; // logo art is dark — render white on our dark theme
+  // (the sidebar renders every logo white via a CSS filter, so colour/darkness
+  // of the source file doesn't matter there)
   // Suffix for per-magazine env vars, e.g. WORDPRESS_APP_PASSWORD_HOTEL.
   // MEPCA also falls back to the original unsuffixed vars.
   envSuffix: string;
@@ -61,7 +62,6 @@ export const MAGAZINES: MagazineConfig[] = [
     brandColor: "#8583c4",
     sector: "UK care home and social care sector trade title",
     logo: "/logos/care-home.png",
-    logoNeedsInvert: true, // navy wordmark, unreadable on the dark sidebar as-is
     envSuffix: "CARE_HOME",
   },
   {
