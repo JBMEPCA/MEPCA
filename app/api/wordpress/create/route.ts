@@ -3,6 +3,7 @@ import {
   findOrCreateCompany,
   categoryIdForName,
 } from "@/lib/wordpress";
+import { applyHouseStyle } from "@/lib/house-style";
 
 // Assembles the final HTML (dropping in the already-uploaded images + brand
 // source link), creates/looks up the company term, and creates the DRAFT post.
@@ -81,7 +82,8 @@ export async function POST(request: Request) {
 
   const bodyImages = Array.isArray(body.bodyImages) ? body.bodyImages : [];
   const sourceUrl = (body.sourceUrl ?? "").trim();
-  const content = assembleBody(rawBody, sourceUrl, bodyImages);
+  // Enforce house style (no bold, all headings as H4) regardless of the input.
+  const content = applyHouseStyle(assembleBody(rawBody, sourceUrl, bodyImages));
 
   try {
     const companyName = (body.company ?? "").trim();

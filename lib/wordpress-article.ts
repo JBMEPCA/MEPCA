@@ -34,7 +34,7 @@ const STRUCTURE_INSTRUCTIONS = `You are MEPCA Magazine's web editor. MEPCA is a 
 
 Return ONLY a JSON object (no markdown fence, no commentary) with these exact keys:
 {
-  "title": string,              // the article headline, plain text, no site name
+  "title": string,              // the article headline in Title Case (capitalise the main words; keep minor words like a/an/the/of/for/and/to lower-case unless first or last). Preserve deliberate brand/product capitalisation exactly (igus, xiros, iPhone, MEPCA). No site name.
   "category": string,           // EXACTLY one of the allowed categories below
   "company": string,            // the single primary company the article is about, full brand name as written
   "focusKeyphrase": string,     // 2-4 words someone would Google to find this; include the product/company where it helps ranking
@@ -47,9 +47,11 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
 
 Allowed categories (pick the single best fit — never invent one): ${CATEGORY_NAMES}
 
-bodyHtml rules:
-- Do NOT include the title (no <h1>). Start with the opening paragraph.
-- Use <h2> for section subheadings, <p> for paragraphs, <ul>/<li> for bullet lists, <strong> for emphasis where natural.
+bodyHtml rules (MEPCA house style — follow exactly):
+- Do NOT include the title (no heading tag for it).
+- Begin with a STANDFIRST: one short, engaging sentence summarising the article, wrapped in <h4>. Then start the opening paragraph.
+- Use <h4> for ALL section subheadings — never <h2> or <h3>. Use <p> for paragraphs and <ul>/<li> for bullet lists.
+- NEVER use bold. Do not use <strong> or <b> tags (or any bold styling) anywhere. Emphasise through wording, not formatting.
 - UK spelling (optimised, programmes, organisation, centre). Warm, professional, factual voice. No hype words ("groundbreaking", "revolutionary", "game-changing"). Do not invent facts.
 - Strip any tracking URLs, email artefacts, "for more information contact…" boilerplate, and image credits.
 - Link to the brand at least once: wrap the first mention of the primary company in <a href="[[SOURCE_URL]]" target="_blank" rel="noopener">Company Name</a>. Use the literal placeholder [[SOURCE_URL]] as the href — it is filled in later. If and only if there is genuinely no company to link, omit the anchor.

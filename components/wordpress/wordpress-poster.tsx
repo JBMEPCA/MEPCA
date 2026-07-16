@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
+import { applyHouseStyle } from "@/lib/house-style";
 
 // ---- File text extraction (browser-side, lazy-loaded like the LinkedIn tab) ----
 
@@ -243,7 +244,8 @@ export function WordPressPoster() {
       /\[\[IMAGE_\d+\]\]/g,
       `<div style="padding:12px;border:1px dashed var(--border);border-radius:8px;color:var(--muted-foreground);font-size:13px">Image placeholder — no image supplied</div>`
     );
-    return html;
+    // Show the preview exactly as it will publish (house style enforced).
+    return applyHouseStyle(html);
   }
 
   // ---------- INPUT STAGE ----------
@@ -531,7 +533,7 @@ export function WordPressPoster() {
                   <img src={featurePreview} alt="feature" className="w-full rounded-md" />
                 )}
                 <div
-                  className="space-y-3 [&_a]:text-primary [&_a]:underline [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:pl-5"
+                  className="space-y-3 [&_a]:text-primary [&_a]:underline [&_h4]:mt-4 [&_h4]:text-base [&_h4]:font-semibold [&_ul]:list-disc [&_ul]:pl-5"
                   dangerouslySetInnerHTML={{ __html: previewHtml() }}
                 />
               </article>
