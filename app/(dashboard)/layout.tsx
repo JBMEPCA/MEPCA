@@ -10,6 +10,7 @@ const nav = [
   { href: "/sales", label: "Sales" },
   { href: "/analytics", label: "Analytics" },
   { href: "/competitor-intel", label: "Competitor Intel" },
+  { href: "/linkedin", label: "LinkedIn Generator" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
