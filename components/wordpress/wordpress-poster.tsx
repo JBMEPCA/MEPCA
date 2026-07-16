@@ -55,6 +55,7 @@ type Proposal = {
   sourceUrl: string;
   bodyHtml: string;
   internalLinksFound: number;
+  duplicates: { id: number; title: string; link: string; status: string; score: number }[];
 };
 
 type Stage = "input" | "review" | "done";
@@ -428,6 +429,35 @@ export function WordPressPoster() {
               ← Back to inputs
             </Button>
           </div>
+
+          {p.duplicates?.length > 0 && (
+            <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-3">
+              <p className="text-sm font-semibold text-amber-500">⚠️ Already posted story</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                A very similar article is already on the site. Check it&apos;s not a duplicate before
+                publishing — or carry on if this is intentional.
+              </p>
+              <ul className="mt-2 space-y-1">
+                {p.duplicates.map((d) => (
+                  <li key={d.id} className="text-xs">
+                    <a
+                      href={d.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      {d.title}
+                    </a>{" "}
+                    <span className="text-muted-foreground">
+                      ({d.status === "publish" ? "published" : d.status}
+                      {" · "}
+                      {Math.round(d.score * 100)}% match)
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div>
             <Label className="mb-1.5">Title</Label>

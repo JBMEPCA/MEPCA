@@ -137,6 +137,84 @@ export async function findOrCreateCompany(name: string): Promise<number | null> 
   return created.id;
 }
 
+export type DuplicateMatch = { id: number; title: string; link: string; status: string; score: number };
+
+// Words ignored when comparing titles, so "New … for …" style filler doesn't
+// inflate or deflate the similarity score.
+const TITLE_STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "for", "of", "to", "in", "on", "with", "new",
+  "how", "why", "as", "at", "by", "from", "is", "are", "its", "&",
+]);
+
+function titleTokens(s: string): Set<string> {
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9 ]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !TITLE_STOPWORDS.has(w))
+  );
+}
+
+// How alike two titles are: blend of Jaccard overlap and containment (so a
+// shorter title fully inside a longer one still scores high).
+function titleSimilarity(a: string, b: string): number {
+  const ta = titleTokens(a);
+  const tb = titleTokens(b);
+  if (ta.size === 0 || tb.size === 0) return 0;
+  let inter = 0;
+  for (const t of ta) if (tb.has(t)) inter++;
+  const union = ta.size + tb.size - inter;
+  const jaccard = inter / union;
+  const containment = inter / Math.min(ta.size, tb.size);
+  return Math.max(jaccard, containment);
+}
+
+// Check whether an article this similar has already been posted (published OR
+// sitting as a draft). Returns strong title matches, most similar first. Never
+// throws — a lookup failure just means "no known duplicate".
+//
+// WordPress' post search narrows as you add words, so searching the whole
+// (slightly reworded) title tends to miss the real match. Instead we cast a
+// few wide nets — company, focus keyphrase, and the most distinctive title
+// words — gather candidates, then decide with title similarity.
+export async function findPossibleDuplicates(
+  title: string,
+  company?: string,
+  keyphrase?: string
+): Promise<DuplicateMatch[]> {
+  const queries = new Set<string>();
+  if (company && company.trim()) queries.add(company.trim());
+  if (keyphrase && keyphrase.trim()) queries.add(keyphrase.trim());
+  const keywords = [...titleTokens(title)].sort((a, b) => b.length - a.length).slice(0, 4);
+  if (keywords.length) queries.add(keywords.join(" "));
+  if (queries.size === 0) queries.add(title);
+
+  const byId = new Map<number, { id: number; title: string; link: string; status: string }>();
+  for (const q of queries) {
+    try {
+      const posts = await wpJson<
+        { id: number; title: { rendered: string }; link: string; status: string }[]
+      >(
+        `/wp/v2/posts?search=${encodeURIComponent(q)}&status=any&per_page=10&_fields=id,title,link,status`
+      );
+      for (const p of posts) byId.set(p.id, { id: p.id, title: p.title.rendered, link: p.link, status: p.status });
+    } catch {
+      /* ignore — treat as no match */
+    }
+  }
+
+  const matches: DuplicateMatch[] = [];
+  for (const p of byId.values()) {
+    const clean = decodeEntities(p.title);
+    const score = titleSimilarity(title, clean);
+    if (score >= 0.5) {
+      matches.push({ id: p.id, title: clean, link: p.link, status: p.status, score: Math.round(score * 100) / 100 });
+    }
+  }
+  return matches.sort((a, b) => b.score - a.score).slice(0, 5);
+}
+
 export type UploadedMedia = { id: number; sourceUrl: string };
 
 // Upload one image to the Media Library. `data` is the raw bytes.

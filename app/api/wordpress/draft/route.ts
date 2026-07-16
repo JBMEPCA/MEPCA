@@ -1,5 +1,10 @@
 import { structureArticle, insertInternalLinks } from "@/lib/wordpress-article";
-import { CATEGORIES, searchRelatedPosts, type RelatedPost } from "@/lib/wordpress";
+import {
+  CATEGORIES,
+  searchRelatedPosts,
+  findPossibleDuplicates,
+  type RelatedPost,
+} from "@/lib/wordpress";
 
 // Text is extracted in the browser and posted as JSON, so the payload stays
 // small. This route does the Claude structuring + live internal-link search and
@@ -42,8 +47,16 @@ export async function POST(request: Request) {
     }
     const bodyHtml = await insertInternalLinks(article.bodyHtml, candidates.slice(0, 6));
 
+    // Failsafe: has a very similar article already been posted (or drafted)?
+    const duplicates = await findPossibleDuplicates(
+      article.title,
+      article.company,
+      article.focusKeyphrase
+    );
+
     return Response.json({
       title: article.title,
+      duplicates,
       category: article.category,
       categoryOptions: CATEGORIES.map((c) => c.name),
       company: article.company,
