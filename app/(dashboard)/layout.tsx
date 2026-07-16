@@ -11,6 +11,7 @@ const nav = [
   { href: "/analytics", label: "Analytics" },
   { href: "/competitor-intel", label: "Competitor Intel" },
   { href: "/linkedin", label: "LinkedIn Generator" },
+  { href: "/wordpress", label: "WordPress Poster" },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
