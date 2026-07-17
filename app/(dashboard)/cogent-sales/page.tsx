@@ -162,7 +162,7 @@ export default async function CogentSalesPage({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5">
-          <div className="text-xs uppercase tracking-widest text-primary/80">Lifetime sales</div>
+          <div className="text-xs uppercase tracking-widest text-primary/80">Total sales</div>
           <div className="mt-1 text-3xl font-bold text-primary">{gbp.format(lifetime)}</div>
           <div className="mt-1 text-xs text-muted-foreground">{campaigns.length} bookings</div>
         </div>
@@ -211,7 +211,7 @@ export default async function CogentSalesPage({
                 <TableRow>
                   <TableHead>Magazine</TableHead>
                   <TableHead className="text-right">{thisYear}</TableHead>
-                  <TableHead className="text-right">Lifetime</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
                   <TableHead className="text-right">Bookings</TableHead>
                 </TableRow>
               </TableHeader>
@@ -253,7 +253,7 @@ export default async function CogentSalesPage({
                   <TableRow>
                     <TableHead>Sales person</TableHead>
                     <TableHead className="text-right">{thisYear}</TableHead>
-                    <TableHead className="text-right">Lifetime</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
                     <TableHead className="text-right">Bookings</TableHead>
                   </TableRow>
                 </TableHeader>
