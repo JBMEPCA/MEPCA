@@ -1,4 +1,4 @@
-import { jwtClient } from "@/lib/google";
+import { googleRequest, hasGoogleCreds } from "@/lib/google";
 import { getMagazine } from "@/lib/magazines";
 
 // GA4 + Search Console data for the Analytics dashboard, resolved per
@@ -32,15 +32,14 @@ export function hasAnalyticsConfig(slug: string): boolean {
 type Ga4Row = { dimensionValues?: { value: string }[]; metricValues?: { value: string }[] };
 
 async function runGa4Report(slug: string, body: object): Promise<Ga4Row[]> {
-  const auth = jwtClient(GA_SCOPE);
   const propertyId = ga4PropertyFor(slug);
-  if (!auth || !propertyId) throw new Error("GA4 not configured");
-  const res = await auth.request<{ rows?: Ga4Row[] }>({
-    url: `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
-    method: "POST",
-    data: body,
-  });
-  return res.data.rows ?? [];
+  if (!hasGoogleCreds() || !propertyId) throw new Error("GA4 not configured");
+  const data = await googleRequest<{ rows?: Ga4Row[] }>(
+    GA_SCOPE,
+    `https://analyticsdata.googleapis.com/v1beta/properties/${propertyId}:runReport`,
+    body
+  );
+  return data.rows ?? [];
 }
 
 export type TrafficTotals = {
@@ -123,15 +122,14 @@ export async function trafficChannels(slug: string) {
 type GscRow = { keys?: string[]; clicks: number; impressions: number; ctr: number; position: number };
 
 async function gscQuery(slug: string, body: object): Promise<GscRow[]> {
-  const auth = jwtClient(GSC_SCOPE);
   const site = gscSiteFor(slug);
-  if (!auth || !site) throw new Error("Search Console not configured");
-  const res = await auth.request<{ rows?: GscRow[] }>({
-    url: `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`,
-    method: "POST",
-    data: body,
-  });
-  return res.data.rows ?? [];
+  if (!hasGoogleCreds() || !site) throw new Error("Search Console not configured");
+  const data = await googleRequest<{ rows?: GscRow[] }>(
+    GSC_SCOPE,
+    `https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`,
+    body
+  );
+  return data.rows ?? [];
 }
 
 function isoDaysAgo(days: number) {

@@ -48,8 +48,9 @@ export default async function ContentPage({
       },
       orderBy: { endDate: "asc" },
     }),
-    // The e-shot calendar is MEPCA's Google Calendar; other titles get theirs later
-    mag.slug === "mepca" ? listUpcomingEshots(42) : Promise.resolve(null),
+    // Each magazine's e-shots come off its Google Calendar route (shared
+    // calendar with title prefixes; Hotel has its own "CIM ONLINE" calendar).
+    listUpcomingEshots(mag.slug, 42),
   ]);
 
   let issueGroups: {
