@@ -199,3 +199,110 @@
 
 .spy--dragging { cursor: grabbing; }
 .spy-grab { cursor: grab; touch-action: none; }
+
+/* ---------- Google Ads Leads: the Sniper ---------- */
+.sniper {
+  position: relative;
+  display: inline-block;
+  filter: drop-shadow(0 6px 5px rgb(0 0 0 / 0.2));
+}
+.sniper-grab { cursor: grab; touch-action: none; }
+.sniper-flash { opacity: 0; transform-origin: 129px 60px; }
+.sniper-scope-glint { opacity: 0.5; }
+
+/* aiming: locked on, steady breathing, scope glinting */
+.sniper--aiming .sniper-rig { animation: sniper-breathe 3s ease-in-out infinite; transform-origin: 50% 90%; }
+.sniper--aiming .sniper-scope-glint { animation: sniper-glint 2.2s ease-in-out infinite; }
+
+/* firing: muzzle flash + recoil kick backwards (rig shoves left) */
+.sniper--firing .sniper-flash { animation: sniper-muzzle 0.38s ease-out; }
+.sniper--firing .sniper-rig { animation: sniper-recoil 0.38s ease-out; }
+.sniper--firing .sniper-scope-glint { opacity: 1; }
+
+/* walking / being dragged: little bob */
+.sniper--walking .sniper-rig { animation: sniper-bob 0.5s ease-in-out infinite; }
+
+@keyframes sniper-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(0.8px); } }
+@keyframes sniper-glint { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@keyframes sniper-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+@keyframes sniper-recoil {
+  0% { transform: translateX(0) rotate(0deg); }
+  30% { transform: translateX(-5px) rotate(-2deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+@keyframes sniper-muzzle {
+  0% { opacity: 0; transform: scale(0.2); }
+  35% { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* dot-grid backdrop already comes from .hq-arena; sniper arena just needs room */
+.sniper-arena { overflow: hidden; }
+
+/* ---------- the Google-Ads phone mockup the sniper is aiming at ---------- */
+.ads-phone {
+  width: 188px;
+  height: 214px;
+  border-radius: 22px;
+  background: #111;
+  padding: 7px;
+  box-shadow: 0 10px 24px rgb(0 0 0 / 0.28);
+  position: relative;
+}
+.ads-phone-notch {
+  position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+  width: 54px; height: 8px; background: #111; border-radius: 0 0 8px 8px; z-index: 2;
+}
+.ads-phone-screen {
+  width: 100%; height: 100%;
+  background: #fff; border-radius: 16px;
+  padding: 14px 12px 10px; overflow: hidden;
+}
+.ads-phone-googlebar {
+  text-align: center; font-weight: 600; font-size: 15px; letter-spacing: -0.3px;
+  margin-bottom: 8px; font-family: Arial, sans-serif;
+}
+.ads-g { display: inline-block; }
+.ads-g1 { color: #4285f4; }
+.ads-g2 { color: #ea4335; }
+.ads-g3 { color: #fbbc05; }
+.ads-g4 { color: #34a853; }
+.ads-searchbox {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid #dfe1e5; border-radius: 999px;
+  padding: 5px 10px; margin-bottom: 10px; min-height: 24px;
+}
+.ads-search-term {
+  font-size: 11px; color: #3c4043; font-family: Arial, sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: ads-swap 0.35s ease-out;
+}
+.ads-card {
+  border: 1px solid #ececec; border-radius: 10px; padding: 9px 10px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.08);
+  animation: ads-swap 0.35s ease-out;
+}
+.ads-card-top { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.ads-badge {
+  font-size: 9px; font-weight: 700; color: #202124;
+  border: 1px solid #dadce0; border-radius: 3px; padding: 0 3px;
+  font-family: Arial, sans-serif;
+}
+.ads-company {
+  font-size: 13px; font-weight: 600; color: #1a0dab; font-family: Arial, sans-serif;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ads-rating { font-size: 10px; color: #70757a; font-family: Arial, sans-serif; margin-bottom: 4px; }
+.ads-stars { color: #fbbc05; letter-spacing: -1px; }
+.ads-copy {
+  font-size: 10px; color: #4d5156; line-height: 1.35; font-family: Arial, sans-serif;
+  margin-bottom: 7px;
+}
+.ads-call {
+  font-size: 11px; font-weight: 600; color: #1a73e8; font-family: Arial, sans-serif;
+  border-top: 1px solid #ececec; padding-top: 6px;
+}
+@keyframes ads-swap {
+  0% { opacity: 0; transform: translateY(4px); }
+  100% { opacity: 1; transform: translateY(0); }
+}

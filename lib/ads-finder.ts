@@ -3,9 +3,10 @@ import type { MonitoredTerm } from "@prisma/client";
 import { searchGoogleAds, type SerperAd } from "@/lib/serper";
 
 // The Sniper's job: for one monitored term, search UK Google, read who's paying
-// for ads on it, and log each advertiser as a prospective MEPCA lead.
-// Mirrors lib/scanner.ts (the competitor-intel spy), but the "source" is a
-// Google search term rather than a competitor magazine.
+// for ads on it, and log each advertiser as a prospective lead for that
+// magazine. Mirrors lib/scanner.ts (the competitor-intel spy), but the "source"
+// is a Google search term rather than a competitor magazine. Every row is
+// stamped with the term's magazineId so titles never see each other's leads.
 
 function dedupeKeyFor(company: string, term: string) {
   return [company, term].map((s) => s.toLowerCase().trim()).join("|");

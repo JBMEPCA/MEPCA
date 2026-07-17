@@ -94,4 +94,59 @@ export const scanSourceOnDemand = inngest.createFunction(
   }
 );
 
-export const functions = [refreshCampaignStatuses, scanCompetitorSources, scanSourceOnDemand];
+// Weekly Google Ads sweep: every Monday 06:30 UK time (staggered after the
+// competitor scan), the Sniper searches every active monitored term across all
+// magazines. Each term runs as its own step so one slow search can't sink the run.
+export const searchGoogleAdsTerms = inngest.createFunction(
+  {
+    id: "search-google-ads-terms",
+    triggers: [{ cron: "TZ=Europe/London 30 6 * * 1" }],
+  },
+  async ({ step }) => {
+    const { runTermSearch } = await import("@/lib/ads-finder");
+    const terms = await step.run("load-terms", () =>
+      db.monitoredTerm.findMany({ where: { active: true } })
+    );
+
+    const results: Record<string, string> = {};
+    for (const term of terms) {
+      results[`${term.magazineId}:${term.term}`] = await step.run(
+        `search-${term.id}`,
+        () =>
+          runTermSearch({
+            ...term,
+            createdAt: new Date(term.createdAt),
+            updatedAt: new Date(term.updatedAt),
+            lastCheckedAt: term.lastCheckedAt ? new Date(term.lastCheckedAt) : null,
+          })
+      );
+    }
+    return results;
+  }
+);
+
+// On-demand search of a single term — fired by the Sniper HQ drag-drop and the
+// "Search now" button
+export const searchAdsTermOnDemand = inngest.createFunction(
+  {
+    id: "search-ads-term-on-demand",
+    triggers: [{ event: "ads/search.requested" }],
+  },
+  async ({ event, step }) => {
+    const { runTermSearch } = await import("@/lib/ads-finder");
+    return step.run("search", async () => {
+      const term = await db.monitoredTerm.findUniqueOrThrow({
+        where: { id: event.data.termId as string },
+      });
+      return runTermSearch(term);
+    });
+  }
+);
+
+export const functions = [
+  refreshCampaignStatuses,
+  scanCompetitorSources,
+  scanSourceOnDemand,
+  searchGoogleAdsTerms,
+  searchAdsTermOnDemand,
+];
