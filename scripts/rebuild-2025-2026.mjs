@@ -24,7 +24,7 @@ const SCRATCH =
 
 const PEOPLE = {
   JTB: "JB", JAMESD: "Hames", MG: "Manj", HH: "HH",
-  JIM: "Jim", MBS: "Mike", JAZ: "Jaz", DEC: "Dec",
+  JIM: "Jim", MBS: "Mike", JAZ: "Jaz", DEC: "Dec", KT: "Katy",
 };
 const MAG_CODES = {
   MEPCA: "mepca",

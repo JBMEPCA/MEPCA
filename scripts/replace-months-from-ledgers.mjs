@@ -15,14 +15,15 @@ const SCRATCH =
   "C:/Users/CIMLTD~1/AppData/Local/Temp/claude/C--Users-CIM-Ltd--claude-Claude-Code-Projects-MEPCA-Hub/28f67e15-364e-44ed-83f8-9d10fe48aa7c/scratchpad/";
 
 const FILES = [
-  { file: "cim-fm-rows-jan26.json", issue: "Jan 2026", want: 104213 },
-  { file: "cim-fm-rows-feb26.json", issue: "Feb 2026", want: 113490 },
-  { file: "cim-fm-rows-aug26.json", issue: "Aug 2026", want: 111957 },
+  { file: "cim-fm-rows-sep26.json", issue: "Sep 2026", want: null },
+  { file: "cim-fm-rows-oct26.json", issue: "Oct 2026", want: null },
+  // "Nov 26 FM.pdf" turned out to contain October again — awaiting real Nov
+  { file: "cim-fm-rows-dec26.json", issue: "Dec 2026", want: null },
 ];
 
 const PEOPLE = {
   JTB: "JB", JAMESD: "Hames", MG: "Manj", HH: "HH",
-  JIM: "Jim", MBS: "Mike", JAZ: "Jaz", DEC: "Dec",
+  JIM: "Jim", MBS: "Mike", JAZ: "Jaz", DEC: "Dec", KT: "Katy",
 };
 const MAG_CODES = {
   MEPCA: "mepca", HOT: "hotel", HOTEL: "hotel", BAR: "bar",
@@ -96,7 +97,7 @@ async function main() {
     }
 
     const total = records.reduce((s, r) => s + r.value, 0);
-    console.log(`${targetIssue}: ${records.length} ledger rows £${Math.round(total).toLocaleString("en-GB")} (JB £${want.toLocaleString("en-GB")})` +
+    console.log(`${targetIssue}: ${records.length} ledger rows £${Math.round(total).toLocaleString("en-GB")}${want ? ` (JB £${want.toLocaleString("en-GB")})` : ""}` +
       (skippedCancelled ? ` · ${skippedCancelled} cancelled` : "") +
       (skippedMiele ? ` · ${skippedMiele} Miele` : "") +
       (strays.size ? ` · STRAY ISSUES: ${[...strays].join("; ")}` : ""));
