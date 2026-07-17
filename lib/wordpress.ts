@@ -83,6 +83,52 @@ const SITE_CONFIG: Record<string, WpSiteConfig> = {
     defaultCategoryId: 17, // Supplier News — where press releases live.
     hasCompanyTaxonomy: false,
   },
+  // JB-approved shortlist (2026-07-17) from barmagazine.co.uk's 36 live
+  // categories — the rest are retired one-off event categories.
+  bar: {
+    categories: [
+      { name: "Bar News", id: 10 },
+      { name: "Bar Essentials", id: 15 },
+      { name: "Business", id: 2051 },
+      { name: "Cocktails", id: 12 },
+      { name: "Drink", id: 7 },
+      { name: "Expert Advice", id: 6 },
+      { name: "Features", id: 9 },
+      { name: "Food", id: 186 },
+      { name: "Profiles", id: 8 },
+      { name: "Supplier News", id: 2046 },
+    ],
+    defaultCategoryId: 10, // Bar News
+    hasCompanyTaxonomy: false,
+  },
+  // Probed from carehomemagazine.co.uk 2026-07-17 (excludes Cover Story and
+  // Premium, which are special placements).
+  "care-home": {
+    categories: [
+      { name: "News", id: 1 },
+      { name: "Business", id: 32 },
+      { name: "Charity & Fundraising", id: 37 },
+      { name: "Featured Homes", id: 26 },
+      { name: "Quality of Care", id: 45 },
+      { name: "Quality of Life", id: 46 },
+      { name: "Sustainability", id: 31 },
+    ],
+    defaultCategoryId: 1, // News
+    hasCompanyTaxonomy: false,
+  },
+  // Probed from totalgroomingmagazine.co.uk 2026-07-17 (excludes Premium and
+  // Uncategorized).
+  grooming: {
+    categories: [
+      { name: "Industry News", id: 1 },
+      { name: "Business Tips", id: 47 },
+      { name: "Featured", id: 7 },
+      { name: "Latest News", id: 8 },
+      { name: "Product News", id: 44 },
+    ],
+    defaultCategoryId: 1, // Industry News
+    hasCompanyTaxonomy: false,
+  },
 };
 
 type WpCreds = { site: string; username: string; appPassword: string };

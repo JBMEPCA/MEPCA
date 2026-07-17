@@ -198,9 +198,7 @@ export default async function ContentPage({
         <CardContent>
           {eshotSchedule === null ? (
             <p className="text-sm text-muted-foreground">
-              {mag.slug === "mepca"
-                ? "Couldn't reach the calendar — check the Google credentials are set."
-                : `${mag.shortName}'s e-shot calendar isn't connected yet.`}
+              Couldn&apos;t reach the e-shot calendar — check the Google credentials are set.
             </p>
           ) : eshotSchedule.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing scheduled in the next 6 weeks.</p>

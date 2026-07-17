@@ -88,64 +88,76 @@ export type EshotEvent = {
   raw: string;
 };
 
-// Sister-title prefixes on the shared calendar that aren't MEPCA sends.
-// MEPCA's own events are either "MEPCA - …" or unprefixed, so MEPCA keeps
-// everything EXCEPT these; each sister title keeps ONLY its own prefix.
+// Sister-title prefixes on the main shared calendar that aren't MEPCA sends.
+// MEPCA's own events there are either "MEPCA - …" or unprefixed, so MEPCA
+// keeps everything EXCEPT these; each sister title keeps ONLY its own prefix.
 const SISTER_PREFIXES = /^(bar|hotel|salon|tgm|care home|boutique|barber|stand|id)\s*[-–]/i;
 
-// Which calendar each magazine's e-shots live on, and how to pick its events
-// out. Hotel is booked on a separate calendar ("CIM ONLINE") shared with the
-// service account; everyone else shares GOOGLE_CALENDAR_ID with a title prefix.
-const CALENDAR_ROUTES: Record<
-  string,
-  { envVar: string; include?: RegExp; excludeSisters?: boolean; strip: RegExp }
-> = {
-  mepca: { envVar: "GOOGLE_CALENDAR_ID", excludeSisters: true, strip: /^mepca\s*[-–]\s*/i },
-  bar: { envVar: "GOOGLE_CALENDAR_ID", include: /^bar\s*[-–]/i, strip: /^bar\s*[-–]\s*/i },
-  "care-home": {
-    envVar: "GOOGLE_CALENDAR_ID",
-    include: /^care\s*home\s*[-–]/i,
-    strip: /^care\s*home\s*[-–]\s*/i,
-  },
+// Per-magazine prefix rules. In practice BOTH calendars (the original
+// jontheface86 one in GOOGLE_CALENDAR_ID and the "CIM ONLINE" one in
+// GOOGLE_CALENDAR_ID_ONLINE) carry a mix of titles, so every magazine reads
+// both and keeps only its own events. Unprefixed events count as MEPCA's, but
+// only on the main calendar (that's the long-standing convention there).
+const MAGAZINE_PREFIX: Record<string, { include: RegExp; strip: RegExp }> = {
+  mepca: { include: /^mepca\s*[-–]/i, strip: /^mepca\s*[-–]\s*/i },
+  bar: { include: /^bar\s*[-–]/i, strip: /^bar\s*[-–]\s*/i },
+  hotel: { include: /^hotel\s*[-–]/i, strip: /^hotel\s*[-–]\s*/i },
+  "care-home": { include: /^care\s*home\s*[-–]/i, strip: /^care\s*home\s*[-–]\s*/i },
   grooming: {
-    envVar: "GOOGLE_CALENDAR_ID",
     include: /^(?:tgm|total\s*grooming|grooming)\s*[-–]/i,
     strip: /^(?:tgm|total\s*grooming|grooming)\s*[-–]\s*/i,
   },
-  hotel: { envVar: "GOOGLE_CALENDAR_ID_HOTEL", strip: /^hotel\s*[-–]\s*/i },
 };
 
-export async function listUpcomingEshots(
-  magazineSlug: string,
-  days = 60
-): Promise<EshotEvent[] | null> {
-  const route = CALENDAR_ROUTES[magazineSlug];
-  const calendarId = route ? process.env[route.envVar] : undefined;
-  if (!hasGoogleCreds() || !route || !calendarId) return null;
+type RawEvent = { summary?: string; start?: { date?: string; dateTime?: string } };
 
+async function calendarEvents(calendarId: string, days: number): Promise<RawEvent[]> {
   const timeMin = new Date().toISOString();
   const timeMax = new Date(Date.now() + days * 86400000).toISOString();
   const url =
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events` +
     `?timeMin=${timeMin}&timeMax=${timeMax}&singleEvents=true&orderBy=startTime&maxResults=100`;
+  const data = await googleRequest<{ items: RawEvent[] }>(
+    ["https://www.googleapis.com/auth/calendar.readonly"],
+    url
+  );
+  return data.items ?? [];
+}
+
+export async function listUpcomingEshots(
+  magazineSlug: string,
+  days = 60
+): Promise<EshotEvent[] | null> {
+  const rule = MAGAZINE_PREFIX[magazineSlug];
+  const mainId = process.env.GOOGLE_CALENDAR_ID;
+  const onlineId = process.env.GOOGLE_CALENDAR_ID_ONLINE;
+  if (!hasGoogleCreds() || !rule || (!mainId && !onlineId)) return null;
 
   try {
-    const data = await googleRequest<{
-      items: { summary?: string; start?: { date?: string; dateTime?: string } }[];
-    }>(["https://www.googleapis.com/auth/calendar.readonly"], url);
-    return data.items
-      .filter((e) => {
-        const s = e.summary?.trim();
-        if (!s) return false;
-        if (route.include && !route.include.test(s)) return false;
-        if (route.excludeSisters && SISTER_PREFIXES.test(s)) return false;
-        return true;
-      })
+    // Tolerate one calendar failing — half a schedule beats an error page.
+    const [main, online] = await Promise.all([
+      mainId ? calendarEvents(mainId, days).catch(() => []) : [],
+      onlineId ? calendarEvents(onlineId, days).catch(() => []) : [],
+    ]);
+
+    const keep = (e: RawEvent, unprefixedIsMepca: boolean): boolean => {
+      const s = e.summary?.trim();
+      if (!s) return false;
+      if (rule.include.test(s)) return true;
+      // Unprefixed events on the main calendar are MEPCA sends by convention.
+      return magazineSlug === "mepca" && unprefixedIsMepca && !SISTER_PREFIXES.test(s);
+    };
+
+    return [
+      ...main.filter((e) => keep(e, true)),
+      ...online.filter((e) => keep(e, false)),
+    ]
       .map((e) => ({
         date: new Date(e.start?.date ?? e.start?.dateTime ?? 0),
-        title: e.summary!.trim().replace(route.strip, "").trim(),
+        title: e.summary!.trim().replace(rule.strip, "").trim(),
         raw: e.summary!,
-      }));
+      }))
+      .sort((a, b) => a.date.getTime() - b.date.getTime());
   } catch (err) {
     console.error("calendar fetch failed", err);
     return null;
