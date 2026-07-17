@@ -36,6 +36,8 @@ model Magazine {
   competitorAdvertisers CompetitorAdvertiser[]
   monitoredTerms        MonitoredTerm[]
   googleAdsLeads        GoogleAdsLead[]
+  sitePages             SitePage[]
+  siteCrawls            SiteCrawl[]
 }
 
 enum CampaignStatus {
@@ -246,4 +248,61 @@ model GoogleAdsLead {
   lastSeenAt    DateTime @default(now())
 
   @@unique([magazineId, dedupeKey])
+}
+
+// ---------- Internal Link Map ----------
+// A snapshot of the magazine website's pages and the in-content links between
+// them, feeding the 3D "Internal Linking Map" tab. Rebuilt by each crawl.
+
+model SitePage {
+  id         String    @id @default(cuid())
+  magazine   Magazine  @relation(fields: [magazineId], references: [id])
+  magazineId String
+  url        String // normalised full URL (no www, no trailing slash)
+  path       String // pathname shown in the UI, e.g. "/advertise-with-us"
+  title      String?
+  kind       String // "page" | "post" | "company", from which Yoast sitemap listed it
+  httpStatus Int?
+  crawledAt  DateTime?
+
+  linksOut SiteLink[] @relation("linkSource")
+  linksIn  SiteLink[] @relation("linkTarget")
+
+  @@unique([magazineId, url])
+  @@index([magazineId])
+}
+
+// One in-content hyperlink from one crawled page to another
+model SiteLink {
+  id         String   @id @default(cuid())
+  magazineId String
+  from       SitePage @relation("linkSource", fields: [fromId], references: [id], onDelete: Cascade)
+  fromId     String
+  to         SitePage @relation("linkTarget", fields: [toId], references: [id], onDelete: Cascade)
+  toId       String
+
+  @@unique([fromId, toId])
+  @@index([magazineId])
+}
+
+enum CrawlStatus {
+  QUEUED
+  RUNNING
+  DONE
+  ERROR
+}
+
+// Progress/state of one crawl run — the tab polls this for its progress bar
+model SiteCrawl {
+  id           String      @id @default(cuid())
+  magazine     Magazine    @relation(fields: [magazineId], references: [id])
+  magazineId   String
+  status       CrawlStatus @default(QUEUED)
+  totalPages   Int         @default(0)
+  crawledPages Int         @default(0)
+  error        String?
+  startedAt    DateTime    @default(now())
+  finishedAt   DateTime?
+
+  @@index([magazineId])
 }

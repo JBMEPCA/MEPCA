@@ -91,4 +91,5 @@ export const MAGAZINE_TABS = [
   { path: "/competitor-intel", label: "Competitor Intel" },
   { path: "/linkedin", label: "LinkedIn Generator" },
   { path: "/wordpress", label: "WordPress Poster" },
+  { path: "/linkmap", label: "Link Map" },
 ];

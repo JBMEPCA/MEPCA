@@ -94,4 +94,53 @@ export const scanSourceOnDemand = inngest.createFunction(
   }
 );
 
-export const functions = [refreshCampaignStatuses, scanCompetitorSources, scanSourceOnDemand];
+// Internal Link Map crawl — fired by the "Update map" button on the Link Map
+// tab. Seeds the page list from the sitemaps, then crawls in batches; each
+// batch is its own step so the run never hits the serverless time limit and
+// the tab's progress bar can follow along via the SiteCrawl row.
+export const crawlSiteLinks = inngest.createFunction(
+  {
+    id: "crawl-site-links",
+    triggers: [{ event: "linkmap/crawl.requested" }],
+    concurrency: [{ limit: 1 }], // one crawl at a time, site-friendly
+  },
+  async ({ event, step }) => {
+    const { seedCrawl, crawlNextBatch, finishCrawl } = await import("@/lib/linkmap");
+    const magazineId = event.data.magazineId as string;
+    const crawlId = event.data.crawlId as string;
+
+    try {
+      const total = await step.run("seed-from-sitemaps", () =>
+        seedCrawl(magazineId, crawlId)
+      );
+
+      let batchNo = 0;
+      let remaining = total;
+      while (remaining > 0) {
+        const result = await step.run(`crawl-batch-${batchNo}`, () =>
+          crawlNextBatch(magazineId, crawlId, 40)
+        );
+        remaining = result.remaining;
+        batchNo++;
+        if (result.crawled === 0) break; // safety: nothing progressed
+      }
+
+      await step.run("finish", () => finishCrawl(crawlId));
+      return { totalPages: total };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Crawl failed";
+      await db.siteCrawl.update({
+        where: { id: crawlId },
+        data: { status: "ERROR", error: msg, finishedAt: new Date() },
+      });
+      throw e;
+    }
+  }
+);
+
+export const functions = [
+  refreshCampaignStatuses,
+  scanCompetitorSources,
+  scanSourceOnDemand,
+  crawlSiteLinks,
+];
