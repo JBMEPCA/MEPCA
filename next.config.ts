@@ -8,6 +8,14 @@ const OLD_MEPCA_TABS = [
 ];
 
 const nextConfig: NextConfig = {
+  // pdf-parse's bundled pdf.js is plain CommonJS with dynamic requires —
+  // keep it out of the server bundle and load it with native require
+  serverExternalPackages: ["pdf-parse"],
+  // …and make sure its files ship with the fm-sync function on Vercel,
+  // since the createRequire path isn't statically traceable
+  outputFileTracingIncludes: {
+    "/api/fm-sync": ["./node_modules/pdf-parse/**"],
+  },
   async redirects() {
     return OLD_MEPCA_TABS.map((tab) => ({
       source: `/${tab}`,

@@ -7,6 +7,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { SalesChart, type MonthlySales } from "@/components/sales/sales-chart";
+import { FmSyncButton } from "@/components/sales/fm-sync-button";
 import { MAGAZINES, getMagazine } from "@/lib/magazines";
 import { targetForMonth } from "@/lib/targets";
 
@@ -151,11 +152,14 @@ export default async function CogentSalesPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Cogent Sales</h1>
-        <p className="text-sm text-muted-foreground">
-          Every magazine, every sales person — revenue attributed to the issue it runs in.
-        </p>
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Cogent Sales</h1>
+          <p className="text-sm text-muted-foreground">
+            Every magazine, every sales person — revenue attributed to the issue it runs in.
+          </p>
+        </div>
+        <FmSyncButton />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
