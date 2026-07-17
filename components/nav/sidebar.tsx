@@ -115,9 +115,6 @@ export function Sidebar() {
         <p className="mt-2 text-xs text-muted-foreground">
           🕵️ Agent Intel — <span className="text-primary">on duty</span>
         </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          🎯 Sniper — <span className="text-primary">on duty</span>
-        </p>
       </div>
     </aside>
   );

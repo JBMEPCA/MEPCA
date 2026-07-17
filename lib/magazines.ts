@@ -89,7 +89,6 @@ export const MAGAZINE_TABS = [
   { path: "/sales", label: "Sales" },
   { path: "/analytics", label: "Analytics" },
   { path: "/competitor-intel", label: "Competitor Intel" },
-  { path: "/google-ads-leads", label: "Google Ads Leads" },
   { path: "/linkedin", label: "LinkedIn Generator" },
   { path: "/wordpress", label: "WordPress Poster" },
 ];
