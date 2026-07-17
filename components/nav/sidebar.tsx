@@ -5,12 +5,17 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { MAGAZINES, MAGAZINE_TABS } from "@/lib/magazines";
+import { logout } from "@/lib/actions/auth";
 
 // Cogent Hub sidebar: company-level links on top, then a collapsible section
 // per magazine. The section for the magazine you're currently in opens
 // automatically; the rest stay tucked away.
 
-export function Sidebar() {
+export function Sidebar({
+  user,
+}: {
+  user: { username: string; isAdmin: boolean };
+}) {
   const pathname = usePathname();
   const currentSlug = MAGAZINES.find(
     (m) => pathname === `/${m.slug}` || pathname.startsWith(`/${m.slug}/`)
@@ -50,6 +55,16 @@ export function Sidebar() {
         >
           Cogent Sales
         </Link>
+        {user.isAdmin && (
+          <Link
+            href="/accounts"
+            className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-foreground ${
+              pathname === "/accounts" ? "bg-accent text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            Accounts
+          </Link>
+        )}
 
         <div className="mt-4 space-y-1">
           {MAGAZINES.map((mag) => {
@@ -115,6 +130,20 @@ export function Sidebar() {
         <p className="mt-2 text-xs text-muted-foreground">
           🕵️ Agent Intel — <span className="text-primary">on duty</span>
         </p>
+      </div>
+
+      <div className="flex items-center justify-between border-t border-border px-6 py-3">
+        <p className="truncate text-xs text-muted-foreground">
+          Signed in as <span className="font-medium text-foreground">{user.username}</span>
+        </p>
+        <form action={logout}>
+          <button
+            type="submit"
+            className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+          >
+            Log out
+          </button>
+        </form>
       </div>
     </aside>
   );
