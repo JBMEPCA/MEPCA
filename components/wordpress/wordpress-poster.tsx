@@ -40,6 +40,14 @@ async function extractDocText(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch("/api/wordpress/extract-doc", { method: "POST", body: fd });
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) {
+    throw new Error(
+      res.status === 413
+        ? "That .doc file is too large to upload. Try re-saving it as .docx, or paste the text."
+        : "Couldn't read that .doc file. Try re-saving it as .docx, or paste the text."
+    );
+  }
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Couldn't read that .doc file.");
   return (data.text as string).trim();
@@ -52,6 +60,54 @@ async function extractText(file: File): Promise<string> {
   if (name.endsWith(".doc")) return extractDocText(file);
   if (name.endsWith(".txt") || name.endsWith(".md")) return (await file.text()).trim();
   throw new Error("Unsupported file — use PDF, Word (.doc/.docx), TXT, or paste the text.");
+}
+
+// Vercel caps upload requests at ~4.5MB, and print-resolution photos exceed
+// that. Shrink images in the browser to web resolution before uploading —
+// keeps quality high while staying well under the limit. Returns the original
+// untouched if it's already small enough.
+async function downscaleImage(file: File, maxDim = 2200): Promise<File> {
+  if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
+
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = () => reject(new Error("Couldn't read the image."));
+    fr.readAsDataURL(file);
+  });
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = () => reject(new Error("Couldn't read the image."));
+    im.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  // Already web-sized and comfortably under the limit — leave it as-is.
+  if (scale === 1 && file.size <= 3_800_000) return file;
+
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  // White backdrop so PNG/transparent images don't flatten to black as JPEG.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const encode = (quality: number) =>
+    new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+
+  let blob = await encode(0.85);
+  // Extra safety for very detailed images: drop quality if still too big.
+  if (blob && blob.size > 4_000_000) blob = (await encode(0.7)) ?? blob;
+  if (!blob) return file;
+
+  const base = file.name.replace(/\.[^.]+$/, "") || "image";
+  return new File([blob], `${base}.jpg`, { type: "image/jpeg" });
 }
 
 // ---- Types ----
@@ -169,10 +225,23 @@ export function WordPressPoster() {
   }
 
   async function uploadImage(file: File, alt: string): Promise<{ id: number; sourceUrl: string }> {
+    const prepared = await downscaleImage(file);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", prepared);
     fd.append("alt", alt);
     const res = await fetch("/api/wordpress/media", { method: "POST", body: fd });
+
+    // The platform can reject an oversized request with plain text (not JSON),
+    // so read defensively and surface a clear message.
+    const ct = res.headers.get("content-type") ?? "";
+    if (!ct.includes("application/json")) {
+      if (res.status === 413) {
+        throw new Error(
+          `"${file.name}" is too large to upload even after resizing. Please use a smaller image.`
+        );
+      }
+      throw new Error("Image upload failed. Please try a different image.");
+    }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Image upload failed.");
     return data;
