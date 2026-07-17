@@ -52,15 +52,51 @@ export default async function ContentPage({
     mag.slug === "mepca" ? listUpcomingEshots(42) : Promise.resolve(null),
   ]);
 
-  const issueGroups = await Promise.all(
-    deadlines.map(async (d) => {
-      const bookings = await db.campaign.findMany({
-        where: { magazineId: mag.slug, issue: shortIssue(d.issue) },
-        orderBy: [{ contentReceived: "asc" }, { brand: "asc" }],
-      });
-      return { deadline: d, bookings };
-    })
-  );
+  let issueGroups: {
+    key: string;
+    issueTitle: string;
+    adsDeadline: Date | null;
+    printDate: Date | null;
+    bookings: Awaited<ReturnType<typeof db.campaign.findMany>>;
+  }[];
+
+  if (deadlines.length > 0) {
+    issueGroups = await Promise.all(
+      deadlines.map(async (d) => {
+        const bookings = await db.campaign.findMany({
+          where: { magazineId: mag.slug, issue: shortIssue(d.issue) },
+          orderBy: [{ contentReceived: "asc" }, { brand: "asc" }],
+        });
+        return {
+          key: d.id,
+          issueTitle: d.issue,
+          adsDeadline: d.adsDeadline,
+          printDate: d.printDate,
+          bookings,
+        };
+      })
+    );
+  } else {
+    // No deadlines loaded for this title yet — derive the next issues straight
+    // from the bookings so the chase list still works.
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const upcoming = await db.campaign.findMany({
+      where: { magazineId: mag.slug, issue: { not: null }, startDate: { gte: monthStart } },
+      orderBy: [{ startDate: "asc" }, { contentReceived: "asc" }, { brand: "asc" }],
+    });
+    const byIssue = new Map<string, typeof upcoming>();
+    for (const c of upcoming) {
+      if (byIssue.size >= 3 && !byIssue.has(c.issue!)) break;
+      byIssue.set(c.issue!, [...(byIssue.get(c.issue!) ?? []), c]);
+    }
+    issueGroups = [...byIssue.entries()].map(([issue, bookings]) => ({
+      key: issue,
+      issueTitle: issue,
+      adsDeadline: null,
+      printDate: null,
+      bookings,
+    }));
+  }
 
   const banners = liveBanners.filter((c) => BANNER_RE.test(c.package));
 
@@ -73,29 +109,35 @@ export default async function ContentPage({
         </p>
       </div>
 
-      {issueGroups.map(({ deadline, bookings }) => {
-        const days = Math.ceil((deadline.adsDeadline!.getTime() - now.getTime()) / 86400000);
+      {issueGroups.map(({ key, issueTitle, adsDeadline, printDate, bookings }) => {
+        const days = adsDeadline
+          ? Math.ceil((adsDeadline.getTime() - now.getTime()) / 86400000)
+          : null;
         const ads = bookings.filter((b) => !ESHOT_RE.test(b.package));
         const eshots = bookings.filter((b) => ESHOT_RE.test(b.package));
         const received = bookings.filter((b) => b.contentReceived).length;
         return (
-          <Card key={deadline.id} className={days <= 7 ? "border-amber-500/40" : ""}>
+          <Card key={key} className={days !== null && days <= 7 ? "border-amber-500/40" : ""}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>
-                  {deadline.issue} issue
+                  {issueTitle} issue
                   <span className="ml-3 text-sm font-normal text-muted-foreground">
-                    100% ads due {format(deadline.adsDeadline!, "EEE d MMM")}
-                    {deadline.printDate && ` · print ${format(deadline.printDate, "d MMM")}`}
+                    {adsDeadline
+                      ? `100% ads due ${format(adsDeadline, "EEE d MMM")}`
+                      : "no deadline loaded yet"}
+                    {printDate && ` · print ${format(printDate, "d MMM")}`}
                   </span>
                 </span>
                 <span className="flex items-center gap-3">
                   <span className="text-sm font-normal text-muted-foreground">
                     {received}/{bookings.length} received
                   </span>
-                  <Badge variant={days <= 7 ? "destructive" : "outline"}>
-                    {days <= 0 ? "due now" : `${days} days`}
-                  </Badge>
+                  {days !== null && (
+                    <Badge variant={days <= 7 ? "destructive" : "outline"}>
+                      {days <= 0 ? "due now" : `${days} days`}
+                    </Badge>
+                  )}
                 </span>
               </CardTitle>
             </CardHeader>

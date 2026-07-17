@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Bar, BarChart, CartesianGrid, Cell, ReferenceLine, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Bar, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
 
 export type MonthlySales = {
@@ -11,6 +11,7 @@ export type MonthlySales = {
   total: number;
   count: number;
   future: boolean;
+  target?: number | null; // red line — 2026 months only
 };
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -21,11 +22,12 @@ const gbp = new Intl.NumberFormat("en-GB", {
 
 export function SalesChart({ data }: { data: MonthlySales[] }) {
   const nowLabel = data.find((d) => d.future)?.label;
+  const hasTarget = data.some((d) => d.target != null);
   return (
     <div className="h-80 w-full">
       <ResponsiveContainer width="100%" height="100%">
         {/* top margin leaves room for the "upcoming" reference-line label */}
-        <BarChart data={data} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
+        <ComposedChart data={data} margin={{ top: 24, right: 8, left: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="pastBar" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.95} />
@@ -64,7 +66,10 @@ export function SalesChart({ data }: { data: MonthlySales[] }) {
             // dark tooltip, so set both explicitly.
             itemStyle={{ color: "#e2e8f0" }}
             labelStyle={{ color: "#94a3b8" }}
-            formatter={(value) => [gbp.format(Number(value)), "Issue revenue"]}
+            formatter={(value, name) => [
+              gbp.format(Number(value)),
+              name === "target" ? "Target" : "Issue revenue",
+            ]}
           />
           {nowLabel && (
             <ReferenceLine
@@ -79,7 +84,19 @@ export function SalesChart({ data }: { data: MonthlySales[] }) {
               <Cell key={entry.month} fill={entry.future ? "url(#futureBar)" : "url(#pastBar)"} />
             ))}
           </Bar>
-        </BarChart>
+          {hasTarget && (
+            <Line
+              dataKey="target"
+              type="monotone"
+              stroke="#f87171"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+              dot={false}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          )}
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SalesChart, type MonthlySales } from "@/components/sales/sales-chart";
 import { notFound } from "next/navigation";
 import { getMagazine } from "@/lib/magazines";
+import { targetForMonth } from "@/lib/targets";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function SalesPage({
       total: Math.round(v.total),
       count: v.count,
       future: month > thisMonthKey,
+      target: targetForMonth(month, { magazine: mag.slug }),
     }));
 
   // Show the last 12 issues plus everything booked in the future

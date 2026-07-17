@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/table";
 import { SalesChart, type MonthlySales } from "@/components/sales/sales-chart";
 import { MAGAZINES, getMagazine } from "@/lib/magazines";
+import { targetForMonth } from "@/lib/targets";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,9 @@ export default async function CogentSalesPage({
       total: Math.round(v.total),
       count: v.count,
       future: month > thisMonthKey,
+      // person filter → their personal target; magazine filter → that title's
+      // target; no filter → whole-company target
+      target: targetForMonth(month, { magazine: mag, person }),
     }));
   const firstShown = Math.max(0, months.filter((m) => !m.future).length - 12);
   const chartData = months.slice(firstShown);
