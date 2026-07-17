@@ -34,12 +34,24 @@ async function extractDocxText(file: File): Promise<string> {
   return value.replace(/[ \t]+/g, " ").trim();
 }
 
+// Legacy .doc (Word 97–2003) can't be parsed in the browser, so send the raw
+// file to the server, which reads it with word-extractor.
+async function extractDocText(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/wordpress/extract-doc", { method: "POST", body: fd });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Couldn't read that .doc file.");
+  return (data.text as string).trim();
+}
+
 async function extractText(file: File): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf")) return extractPdfText(file);
   if (name.endsWith(".docx")) return extractDocxText(file);
+  if (name.endsWith(".doc")) return extractDocText(file);
   if (name.endsWith(".txt") || name.endsWith(".md")) return (await file.text()).trim();
-  throw new Error("Unsupported file — use PDF, DOCX, TXT, or paste the text.");
+  throw new Error("Unsupported file — use PDF, Word (.doc/.docx), TXT, or paste the text.");
 }
 
 // ---- Types ----
@@ -276,11 +288,11 @@ export function WordPressPoster() {
               <input
                 ref={fileInput}
                 type="file"
-                accept=".pdf,.docx,.txt,.md"
+                accept=".pdf,.docx,.doc,application/msword,.txt,.md"
                 className="hidden"
                 onChange={(e) => e.target.files?.[0] && onArticleFile(e.target.files[0])}
               />
-              <p className="text-sm font-medium">{fileName ?? "Drop a PDF, Word (.docx) or text file"}</p>
+              <p className="text-sm font-medium">{fileName ?? "Drop a PDF, Word (.doc/.docx) or text file"}</p>
               <p className="mt-1 text-xs text-muted-foreground">or paste the text below</p>
             </div>
             <Textarea
