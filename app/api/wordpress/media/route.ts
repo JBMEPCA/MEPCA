@@ -1,4 +1,4 @@
-import { uploadMedia } from "@/lib/wordpress";
+import { uploadMedia, hasWordPressCreds } from "@/lib/wordpress";
 
 // Uploads a single image to the WordPress Media Library. One image per request
 // keeps each payload well under Vercel's body limit. The app password stays
@@ -11,6 +11,11 @@ export async function POST(request: Request) {
     form = await request.formData();
   } catch {
     return Response.json({ error: "Invalid upload." }, { status: 400 });
+  }
+
+  const magazine = ((form.get("magazine") as string | null) ?? "mepca").trim();
+  if (!hasWordPressCreds(magazine)) {
+    return Response.json({ error: "WordPress isn't connected for this magazine yet." }, { status: 400 });
   }
 
   const file = form.get("file");
@@ -27,7 +32,7 @@ export async function POST(request: Request) {
 
   try {
     const data = await file.arrayBuffer();
-    const media = await uploadMedia(data, file.name, file.type, alt || undefined);
+    const media = await uploadMedia(magazine, data, file.name, file.type, alt || undefined);
     return Response.json({ id: media.id, sourceUrl: media.sourceUrl });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Upload failed.";

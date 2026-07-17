@@ -1,9 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CATEGORIES } from "@/lib/wordpress";
+import { categoriesFor } from "@/lib/wordpress";
+import { getMagazine } from "@/lib/magazines";
 
 // Turns a raw press release / article into a structured, WordPress-ready
 // proposal that JB reviews before a draft is created. All the SEO/formatting
-// decisions live here so the API route stays thin.
+// decisions live here so the API route stays thin. Everything is written per
+// magazine — the title's name, sector and category list feed the prompt.
 
 let _client: Anthropic | null = null;
 function client(): Anthropic {
@@ -28,9 +30,7 @@ export type StructuredArticle = {
   internalLinkQueries: string[];
 };
 
-const CATEGORY_NAMES = CATEGORIES.map((c) => c.name).join(", ");
-
-const STRUCTURE_INSTRUCTIONS = `You are MEPCA Magazine's web editor. MEPCA is a UK manufacturing and engineering trade magazine. Turn the supplied article/press-release text into a clean, WordPress-ready blog post and its SEO metadata.
+const STRUCTURE_INSTRUCTIONS = `You are {{MAG_NAME}}'s web editor. {{MAG_NAME}} is a {{MAG_SECTOR}}. Turn the supplied article/press-release text into a clean, WordPress-ready blog post and its SEO metadata.
 
 Return ONLY a JSON object (no markdown fence, no commentary) with these exact keys:
 {
@@ -42,12 +42,12 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
   "excerpt": string,            // 1-2 sentence summary, plain prose, no dashes as separators
   "sourceUrl": string | null,   // the brand's own URL found in the text (their website or the release's source link); null if none is present
   "bodyHtml": string,           // the article body as HTML (see rules)
-  "internalLinkQueries": string[] // 3-5 short topic phrases to search MEPCA's own site for related articles to link to
+  "internalLinkQueries": string[] // 3-5 short topic phrases to search {{MAG_NAME}}'s own site for related articles to link to
 }
 
-Allowed categories (pick the single best fit — never invent one): ${CATEGORY_NAMES}
+Allowed categories (pick the single best fit — never invent one): {{CATEGORY_NAMES}}
 
-bodyHtml rules (MEPCA house style — follow exactly):
+bodyHtml rules (house style — follow exactly):
 - Do NOT include the title (no heading tag for it).
 - Begin with a STANDFIRST: one short, engaging sentence summarising the article, wrapped in <h4>. Then start the opening paragraph.
 - Use <h4> for ALL section subheadings — never <h2> or <h3>. Use <p> for paragraphs and <ul>/<li> for bullet lists.
@@ -70,12 +70,22 @@ function stripToJson(text: string): string {
 }
 
 export async function structureArticle(
+  magazineSlug: string,
   sourceText: string,
   bodyImageCount: number,
   brandUrlHint?: string
 ): Promise<StructuredArticle> {
+  const mag = getMagazine(magazineSlug);
+  if (!mag) throw new Error(`Unknown magazine "${magazineSlug}".`);
+  const categoryNames = categoriesFor(magazineSlug)
+    .map((c) => c.name)
+    .join(", ");
+
   const text = sourceText.slice(0, 120_000);
-  const system = STRUCTURE_INSTRUCTIONS.replaceAll("{{IMAGE_COUNT}}", String(bodyImageCount));
+  const system = STRUCTURE_INSTRUCTIONS.replaceAll("{{MAG_NAME}}", mag.name)
+    .replaceAll("{{MAG_SECTOR}}", mag.sector)
+    .replaceAll("{{CATEGORY_NAMES}}", categoryNames)
+    .replaceAll("{{IMAGE_COUNT}}", String(bodyImageCount));
 
   const response = await client().messages.create({
     model: MODEL,
@@ -116,23 +126,26 @@ export async function structureArticle(
   return parsed;
 }
 
-// Second pass: given the body and a shortlist of real MEPCA articles, weave in
-// up to 3 internal links. Kept separate so a search failure can't break drafting.
+// Second pass: given the body and a shortlist of the magazine's real articles,
+// weave in up to 3 internal links. Kept separate so a search failure can't
+// break drafting.
 export async function insertInternalLinks(
+  magazineSlug: string,
   bodyHtml: string,
   candidates: { title: string; url: string }[]
 ): Promise<string> {
   if (candidates.length === 0) return bodyHtml;
+  const magName = getMagazine(magazineSlug)?.name ?? "the magazine";
 
   const list = candidates.map((c, i) => `${i + 1}. "${c.title}" — ${c.url}`).join("\n");
   const response = await client().messages.create({
     model: MODEL,
     max_tokens: 8000,
-    system: `You add internal links to an existing HTML article body for SEO. You are given a list of real MEPCA articles. Insert AT MOST 3 of them as <a href="URL">anchor text</a> where the surrounding sentence is genuinely relevant — anchor text must be natural words already in (or fitting) the sentence, not "click here". Never link the same URL twice. Do not otherwise change the wording, structure, existing links, or the [[IMAGE_n]] / [[SOURCE_URL]] placeholders. If none of the articles are relevant, return the body unchanged. Return ONLY the HTML body, no commentary or code fence.`,
+    system: `You add internal links to an existing HTML article body for SEO. You are given a list of real ${magName} articles. Insert AT MOST 3 of them as <a href="URL">anchor text</a> where the surrounding sentence is genuinely relevant — anchor text must be natural words already in (or fitting) the sentence, not "click here". Never link the same URL twice. Do not otherwise change the wording, structure, existing links, or the [[IMAGE_n]] / [[SOURCE_URL]] placeholders. If none of the articles are relevant, return the body unchanged. Return ONLY the HTML body, no commentary or code fence.`,
     messages: [
       {
         role: "user",
-        content: `Candidate MEPCA articles:\n${list}\n\n---\n\nHTML body:\n${bodyHtml}`,
+        content: `Candidate ${magName} articles:\n${list}\n\n---\n\nHTML body:\n${bodyHtml}`,
       },
     ],
   });

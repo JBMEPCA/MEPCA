@@ -2,6 +2,7 @@ import {
   createDraft,
   findOrCreateCompany,
   categoryIdForName,
+  hasWordPressCreds,
 } from "@/lib/wordpress";
 import { applyHouseStyle } from "@/lib/house-style";
 
@@ -12,6 +13,7 @@ export const maxDuration = 60;
 type BodyImage = { sourceUrl: string; alt?: string; caption?: string };
 
 type CreateBody = {
+  magazine?: string;
   title?: string;
   bodyHtml?: string;
   excerpt?: string;
@@ -74,6 +76,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
 
+  const magazine = (body.magazine ?? "mepca").trim();
+  if (!hasWordPressCreds(magazine)) {
+    return Response.json({ error: "WordPress isn't connected for this magazine yet." }, { status: 400 });
+  }
+
   const title = (body.title ?? "").trim();
   const rawBody = (body.bodyHtml ?? "").trim();
   if (!title || !rawBody) {
@@ -87,13 +94,13 @@ export async function POST(request: Request) {
 
   try {
     const companyName = (body.company ?? "").trim();
-    const companyId = companyName ? await findOrCreateCompany(companyName) : null;
+    const companyId = companyName ? await findOrCreateCompany(magazine, companyName) : null;
 
-    const draft = await createDraft({
+    const draft = await createDraft(magazine, {
       title,
       content,
       excerpt: (body.excerpt ?? "").trim(),
-      categoryId: categoryIdForName(body.category),
+      categoryId: categoryIdForName(magazine, body.category),
       companyId,
       featuredMediaId: body.featuredMediaId ?? null,
       focusKeyphrase: (body.focusKeyphrase ?? "").trim(),

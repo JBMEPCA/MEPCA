@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrafficChart } from "@/components/analytics/traffic-chart";
 import {
   trafficOverview, dailySessions, topPages, trafficChannels, searchOverview, topQueries,
+  hasAnalyticsConfig,
 } from "@/lib/analytics";
 import { notFound } from "next/navigation";
 import { getMagazine } from "@/lib/magazines";
@@ -38,8 +39,9 @@ export default async function AnalyticsPage({
   const mag = getMagazine(magazine);
   if (!mag) notFound();
 
-  // Google Analytics + Search Console are only wired up for MEPCA so far.
-  if (mag.slug !== "mepca") {
+  // Switches on per title once its GA4 property ID + Search Console site are
+  // in the environment (GA4_PROPERTY_ID_<SUFFIX> / GSC_SITE_URL_<SUFFIX>).
+  if (!hasAnalyticsConfig(mag.slug)) {
     return (
       <NotSetUpYet
         title={`${mag.shortName} Analytics`}
@@ -52,12 +54,12 @@ export default async function AnalyticsPage({
   let data;
   try {
     const [overview, daily, pages, channels, search, queries] = await Promise.all([
-      trafficOverview(),
-      dailySessions(90),
-      topPages(10),
-      trafficChannels(),
-      searchOverview(),
-      topQueries(10),
+      trafficOverview(mag.slug),
+      dailySessions(mag.slug, 90),
+      topPages(mag.slug, 10),
+      trafficChannels(mag.slug),
+      searchOverview(mag.slug),
+      topQueries(mag.slug, 10),
     ]);
     data = { overview, daily, pages, channels, search, queries };
   } catch (e) {
@@ -135,7 +137,7 @@ export default async function AnalyticsPage({
                     className="min-w-0 truncate hover:text-primary hover:underline"
                     title={p.title}
                   >
-                    {p.title.replace(/ [-|–] MEPCA.*$/i, "")}
+                    {p.title.replace(/ [-|–] (MEPCA|hotel magazine|Bar Magazine|Care Home Magazine|Total Grooming).*$/i, "")}
                   </a>
                   <span className="shrink-0 font-semibold text-primary">{num(p.views)}</span>
                 </li>

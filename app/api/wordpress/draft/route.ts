@@ -1,6 +1,8 @@
 import { structureArticle, insertInternalLinks } from "@/lib/wordpress-article";
 import {
-  CATEGORIES,
+  categoriesFor,
+  hasWordPressCreds,
+  hasCompanyTaxonomy,
   searchRelatedPosts,
   findPossibleDuplicates,
   type RelatedPost,
@@ -12,11 +14,16 @@ import {
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
-  let body: { text?: string; bodyImageCount?: number; brandUrl?: string };
+  let body: { magazine?: string; text?: string; bodyImageCount?: number; brandUrl?: string };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  const magazine = (body.magazine ?? "mepca").trim();
+  if (!hasWordPressCreds(magazine)) {
+    return Response.json({ error: "WordPress isn't connected for this magazine yet." }, { status: 400 });
   }
 
   const text = (body.text ?? "").trim();
@@ -31,13 +38,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const article = await structureArticle(text, bodyImageCount, brandUrl || undefined);
+    const article = await structureArticle(magazine, text, bodyImageCount, brandUrl || undefined);
 
-    // Search MEPCA's own site for related articles, then let Claude weave in links.
+    // Search the magazine's own site for related articles, then let Claude weave in links.
     const seen = new Set<string>();
     const candidates: RelatedPost[] = [];
     for (const q of article.internalLinkQueries) {
-      const hits = await searchRelatedPosts(q, 3);
+      const hits = await searchRelatedPosts(magazine, q, 3);
       for (const h of hits) {
         if (!seen.has(h.url)) {
           seen.add(h.url);
@@ -45,10 +52,11 @@ export async function POST(request: Request) {
         }
       }
     }
-    const bodyHtml = await insertInternalLinks(article.bodyHtml, candidates.slice(0, 6));
+    const bodyHtml = await insertInternalLinks(magazine, article.bodyHtml, candidates.slice(0, 6));
 
     // Failsafe: has a very similar article already been posted (or drafted)?
     const duplicates = await findPossibleDuplicates(
+      magazine,
       article.title,
       article.company,
       article.focusKeyphrase
@@ -58,7 +66,8 @@ export async function POST(request: Request) {
       title: article.title,
       duplicates,
       category: article.category,
-      categoryOptions: CATEGORIES.map((c) => c.name),
+      categoryOptions: categoriesFor(magazine).map((c) => c.name),
+      hasCompanyTaxonomy: hasCompanyTaxonomy(magazine),
       company: article.company,
       focusKeyphrase: article.focusKeyphrase,
       metaDescription: article.metaDescription,

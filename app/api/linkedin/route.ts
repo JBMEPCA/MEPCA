@@ -5,13 +5,14 @@ import { generateLinkedInPost, type PostMode } from "@/lib/linkedin";
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  let body: { mode?: string; text?: string; issueLink?: string };
+  let body: { magazine?: string; mode?: string; text?: string; issueLink?: string };
   try {
     body = await request.json();
   } catch {
     return Response.json({ error: "Invalid request." }, { status: 400 });
   }
 
+  const magazine = (body.magazine ?? "mepca").trim();
   const mode: PostMode = body.mode === "issue" ? "issue" : "article";
   const text = (body.text ?? "").trim();
   const issueLink = (body.issueLink ?? "").trim();
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const post = await generateLinkedInPost(mode, text, issueLink);
+    const post = await generateLinkedInPost(magazine, mode, text, issueLink);
     return Response.json({ post });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Something went wrong generating the post.";

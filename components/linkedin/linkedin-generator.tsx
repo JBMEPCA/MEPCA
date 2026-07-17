@@ -32,11 +32,15 @@ async function extractPdfText(file: File): Promise<string> {
   return parts.join("\n\n").replace(/[ \t]+/g, " ").trim();
 }
 
-const DEFAULT_LINK = "https://lnkd.in/evCWdukN";
+// MEPCA's rolling digital-issue short link; sister titles start blank until
+// JB pastes theirs.
+const DEFAULT_LINKS: Record<string, string> = {
+  mepca: "https://lnkd.in/evCWdukN",
+};
 
-export function LinkedInGenerator() {
+export function LinkedInGenerator({ magazine }: { magazine: string }) {
   const [mode, setMode] = useState<Mode>("article");
-  const [issueLink, setIssueLink] = useState(DEFAULT_LINK);
+  const [issueLink, setIssueLink] = useState(DEFAULT_LINKS[magazine] ?? "");
   const [fileName, setFileName] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,7 +71,7 @@ export function LinkedInGenerator() {
       const res = await fetch("/api/linkedin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, text, issueLink }),
+        body: JSON.stringify({ magazine, mode, text, issueLink }),
       });
       const data = (await res.json()) as { post?: string; error?: string };
       if (!res.ok || !data.post) {

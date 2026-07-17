@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getMagazine } from "@/lib/magazines";
 
 // Turns extracted PDF text (a single article, or a whole issue) into a
 // ready-to-post LinkedIn post that matches MEPCA's house style. The example
@@ -98,22 +99,22 @@ View the digital issue here: ▶ {{LINK}} ◀️
 
 #Manufacturing #Engineering #FacilitiesManagement #UKManufacturing`;
 
-const ARTICLE_INSTRUCTIONS = `You are MEPCA Magazine's social media writer. MEPCA is a UK manufacturing and engineering trade magazine. Write a LinkedIn post promoting ONE article.
+const ARTICLE_INSTRUCTIONS = `You are {{MAG_NAME}}'s social media writer. {{MAG_NAME}} is a {{MAG_SECTOR}}. Write a LinkedIn post promoting ONE article.
 
 Follow the house style shown in the examples EXACTLY:
 - Warm, professional, factual third-person voice. No hype words ("groundbreaking", "revolutionary", "game-changing").
 - UK spelling (optimised, programmes, organisation, centre).
 - Name the featured company IN FULL and early (ideally the first sentence) so it can be tagged. Use the company's full brand name as it appears in the article.
 - 2-4 short paragraphs: an opening hook, then what the article covers / explains / highlights. Optionally a short closing thought or thank-you where it fits the article (e.g. for a charity or awards piece).
-- Then a call-to-read line. Vary it naturally like the examples: "Read the full article in the latest edition of MEPCA:", "Read the full article in the latest issue of MEPCA:", or "Discover how ... in the latest edition of MEPCA:".
+- Then a call-to-read line. Vary it naturally like the examples: "Read the full article in the latest edition of {{MAG_NAME}}:", "Read the full article in the latest issue of {{MAG_NAME}}:", or "Discover how ... in the latest edition of {{MAG_NAME}}:".
 - On the NEXT line, output the digital issue link exactly as provided: {{LINK}}
-- Then a blank line, then EXACTLY 3 hashtags, space-separated, each starting with a single #, CamelCase, no "hashtag#" prefix. Choose hashtags that fit the article's topic (the first is often #Engineering or #Manufacturing).
-- No emojis. No markdown. No preamble or sign-off — output ONLY the post text, ready to paste.`;
+- Then a blank line, then EXACTLY 3 hashtags, space-separated, each starting with a single #, CamelCase, no "hashtag#" prefix. Choose hashtags that fit the article's topic and the magazine's sector.
+- No emojis. No markdown. No preamble or sign-off — output ONLY the post text, ready to paste.{{SISTER_NOTE}}`;
 
-const ISSUE_INSTRUCTIONS = `You are MEPCA Magazine's social media writer. MEPCA is a UK manufacturing and engineering trade magazine. Write the monthly WHOLE-ISSUE round-up LinkedIn post from the full issue text.
+const ISSUE_INSTRUCTIONS = `You are {{MAG_NAME}}'s social media writer. {{MAG_NAME}} is a {{MAG_SECTOR}}. Write the monthly WHOLE-ISSUE round-up LinkedIn post from the full issue text.
 
 Follow the formula in the example EXACTLY — same structure, same emojis, same order:
-1. First line: "<Month>'s Issue of MEPCA is now available online!" (use the issue's month).
+1. First line: "<Month>'s Issue of {{MAG_NAME}} is now available online!" (use the issue's month).
 2. Blank line, then: "The digital issue is live here: ▶ {{LINK}} ◀️"
 3. Blank line, then the focus paragraph: "Our <Month> issue places a strong focus on #<MainTheme>, exploring the technologies, strategies and expertise ..." — identify the issue's main feature theme and turn it into a hashtag.
 4. 🏢 Paragraph on the lead feature section, naming the leading companies and what they cover.
@@ -121,27 +122,43 @@ Follow the formula in the example EXACTLY — same structure, same emojis, same 
 6. 🏆 Paragraph on the #ManufacturingChampionOfTheMonth — name the person, their title and company.
 7. 🤖 Paragraph on any Editor's Choice / special report.
 8. A list of 🔷 lines — one per featured company: "🔷 <Company> on <what they cover>".
-9. "This issue of MEPCA also includes:" then a blank line.
+9. "This issue of {{MAG_NAME}} also includes:" then a blank line.
 10. 📰 Industry News from <companies>.
 11. 💬 Opinion pieces from <organisations>.
 12. The section lines with emojis: 📦 Warehouse Automation with ..., 🔬 Process Control with ..., ⚙️ Injection Moulding with ..., 🦺 Health & Safety with ..., 🖥️ Digitisation with ... — use whichever sections and companies actually appear in this issue.
 13. 📅 Event coverage and previews, including <events>.
 14. "View the digital issue here: ▶ {{LINK}} ◀️"
-15. Blank line, then 4 hashtags: #Manufacturing #Engineering #<MainTheme> #UKManufacturing.
+15. Blank line, then 4 hashtags fitting the magazine's sector, ending #<MainTheme> where it fits.
 
 Rules:
 - Use ONLY companies, people, sections and events that genuinely appear in the issue text. Do NOT invent names — if a section from the example isn't in this issue, leave it out; if there are extra sections, include them in the same style.
 - Spell company and people names exactly as written in the issue so they can be tagged.
 - UK spelling. Warm, professional voice. Hashtags use a single # with no "hashtag#" prefix.
-- Output ONLY the post text, ready to paste — no preamble.`;
+- Output ONLY the post text, ready to paste — no preamble.{{SISTER_NOTE}}`;
 
 export async function generateLinkedInPost(
+  magazineSlug: string,
   mode: PostMode,
   sourceText: string,
   issueLink: string
 ): Promise<string> {
+  const mag = getMagazine(magazineSlug);
+  if (!mag) throw new Error(`Unknown magazine "${magazineSlug}".`);
+
+  // The reference posts are JB's real MEPCA posts. Sister titles copy the
+  // format but write in their own sector's voice.
+  const sisterNote =
+    mag.slug === "mepca"
+      ? ""
+      : `\n\nNOTE: the reference posts below are from sister title MEPCA (a manufacturing magazine). Copy their FORMAT, length and tone exactly, but write for ${mag.name} — use this magazine's sector, companies and topics, and skip any MEPCA-specific section (e.g. Manufacturing Champion of the Month) that doesn't appear in the supplied text.`;
+
   const link = issueLink.trim() || "{{LINK}}";
-  const instructions = mode === "issue" ? ISSUE_INSTRUCTIONS : ARTICLE_INSTRUCTIONS;
+  const fill = (s: string) =>
+    s
+      .replaceAll("{{MAG_NAME}}", mag.name)
+      .replaceAll("{{MAG_SECTOR}}", mag.sector)
+      .replaceAll("{{SISTER_NOTE}}", sisterNote);
+  const instructions = fill(mode === "issue" ? ISSUE_INSTRUCTIONS : ARTICLE_INSTRUCTIONS);
   const examples = mode === "issue" ? ISSUE_EXAMPLE : ARTICLE_EXAMPLES;
 
   // Guard against runaway payloads while keeping enough for a whole issue.
@@ -157,7 +174,7 @@ export async function generateLinkedInPost(
       {
         role: "user",
         content: `Here is the ${
-          mode === "issue" ? "full text of this month's MEPCA issue" : "MEPCA article"
+          mode === "issue" ? `full text of this month's ${mag.name} issue` : `${mag.name} article`
         }, extracted from the PDF. Write the LinkedIn post.\n\n---\n\n${text}`,
       },
     ],

@@ -116,6 +116,7 @@ type Proposal = {
   title: string;
   category: string;
   categoryOptions: string[];
+  hasCompanyTaxonomy: boolean;
   company: string;
   focusKeyphrase: string;
   metaDescription: string;
@@ -130,7 +131,7 @@ type Stage = "input" | "review" | "done";
 
 // ---- Component ----
 
-export function WordPressPoster() {
+export function WordPressPoster({ magazine }: { magazine: string }) {
   const [stage, setStage] = useState<Stage>("input");
   const [text, setText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
@@ -207,7 +208,7 @@ export function WordPressPoster() {
       const res = await fetch("/api/wordpress/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, bodyImageCount: bodyImages.length, brandUrl }),
+        body: JSON.stringify({ magazine, text, bodyImageCount: bodyImages.length, brandUrl }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -227,6 +228,7 @@ export function WordPressPoster() {
   async function uploadImage(file: File, alt: string): Promise<{ id: number; sourceUrl: string }> {
     const prepared = await downscaleImage(file);
     const fd = new FormData();
+    fd.append("magazine", magazine);
     fd.append("file", prepared);
     fd.append("alt", alt);
     const res = await fetch("/api/wordpress/media", { method: "POST", body: fd });
@@ -267,6 +269,7 @@ export function WordPressPoster() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          magazine,
           title: p.title,
           bodyHtml: p.bodyHtml,
           excerpt: p.excerpt,
@@ -545,7 +548,7 @@ export function WordPressPoster() {
             <Input value={p.title} onChange={(e) => setP({ ...p, title: e.target.value })} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className={`grid gap-3 ${p.hasCompanyTaxonomy ? "grid-cols-2" : "grid-cols-1"}`}>
             <div>
               <Label className="mb-1.5">Category</Label>
               <select
@@ -560,10 +563,12 @@ export function WordPressPoster() {
                 ))}
               </select>
             </div>
-            <div>
-              <Label className="mb-1.5">Company</Label>
-              <Input value={p.company} onChange={(e) => setP({ ...p, company: e.target.value })} />
-            </div>
+            {p.hasCompanyTaxonomy && (
+              <div>
+                <Label className="mb-1.5">Company</Label>
+                <Input value={p.company} onChange={(e) => setP({ ...p, company: e.target.value })} />
+              </div>
+            )}
           </div>
 
           <div>
@@ -662,7 +667,7 @@ export function WordPressPoster() {
         <div className="text-4xl">✓</div>
         <h2 className="text-lg font-semibold">Draft created in WordPress</h2>
         <p className="max-w-md text-sm text-muted-foreground">
-          Everything is filled in — title, formatting, category, company, images and the Yoast SEO box.
+          Everything is filled in — title, formatting, category, images and the Yoast SEO box.
           Open it, give it a final look, and hit <strong>Publish</strong> when you&apos;re happy.
         </p>
         <div className="flex flex-wrap justify-center gap-3">
