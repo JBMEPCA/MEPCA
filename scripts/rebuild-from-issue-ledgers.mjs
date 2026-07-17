@@ -66,7 +66,7 @@ function parseAmount(raw) {
 
 function parseUkDate(s) {
   const m = (s ?? "").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  return m ? new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+  return m ? new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 12)) : null;
 }
 
 async function main() {
@@ -96,8 +96,8 @@ async function main() {
         package: cell(r, 240, 340) || "Booking",
         value: amt.amount,
         issue: `${MONTH_LABEL[month]} ${year}`,
-        startDate: new Date(year, month, 1),
-        endDate: new Date(year, month + 1, 0),
+        startDate: new Date(Date.UTC(year, month, 1, 12)), // noon UTC = same calendar day in UK and on Vercel
+        endDate: new Date(Date.UTC(year, month + 1, 0, 12)),
         saleDate: parseUkDate(cell(r, 760, 860)),
         salesperson: PEOPLE[sp] ?? (sp || null),
       });

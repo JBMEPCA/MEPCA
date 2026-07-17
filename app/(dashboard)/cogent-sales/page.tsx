@@ -50,7 +50,11 @@ export default async function CogentSalesPage({
     distinct: ["salesperson"],
     orderBy: { salesperson: "asc" },
   });
-  const people = peopleRows.map((r) => r.salesperson!).filter(Boolean);
+  // KT/Katy stays attributed in the data but is not shown as a person (JB)
+  const HIDDEN_PEOPLE = new Set(["Katy", "KT"]);
+  const people = peopleRows
+    .map((r) => r.salesperson!)
+    .filter((p) => p && !HIDDEN_PEOPLE.has(p));
 
   const now = new Date();
   const thisMonthKey = format(now, "yyyy-MM");
@@ -84,8 +88,6 @@ export default async function CogentSalesPage({
     // target; no filter → whole-company target. On Issue view only.
     target: targetForMonth(m.month, { magazine: mag, person }),
   }));
-  let lifetime = 0;
-  for (const c of campaigns) lifetime += Number(c.value ?? 0);
 
   const chartMonths = monthly
     ? buildSeries(campaigns.filter((c) => c.saleDate), (c) => c.saleDate!)
@@ -93,7 +95,15 @@ export default async function CogentSalesPage({
   const firstShown = Math.max(0, chartMonths.filter((m) => !m.future).length - 12);
   const chartData = chartMonths.slice(firstShown);
 
-  const ytd = months.filter((m) => m.month.startsWith(thisYear)).reduce((s, m) => s + m.total, 0);
+  // Year tiles sum raw values (not per-month rounded ones) so they match
+  // FileMaker's own totals to the pound
+  const yearTotal = (y: string) =>
+    campaigns
+      .filter((c) => format(c.startDate!, "yyyy") === y)
+      .reduce((s, c) => s + Number(c.value ?? 0), 0);
+  const ytd = yearTotal(thisYear);
+  const lastYear = String(Number(thisYear) - 1);
+  const lastYearTotal = yearTotal(lastYear);
   const thisIssue = months.find((m) => m.month === thisMonthKey);
   const futureTotal = months.filter((m) => m.future).reduce((s, m) => s + m.total, 0);
 
@@ -121,7 +131,9 @@ export default async function CogentSalesPage({
     if (format(c.startDate!, "yyyy") === thisYear) entry.ytd += Number(c.value ?? 0);
     perPerson.set(key, entry);
   }
-  const personRows = [...perPerson.entries()].sort((a, b) => b[1].ytd - a[1].ytd);
+  const personRows = [...perPerson.entries()]
+    .filter(([name]) => !HIDDEN_PEOPLE.has(name))
+    .sort((a, b) => b[1].ytd - a[1].ytd);
 
   const recentSales = campaigns
     .filter((c) => c.saleDate && Number(c.value ?? 0) > 0)
@@ -182,16 +194,18 @@ export default async function CogentSalesPage({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5">
-          <div className="text-xs uppercase tracking-widest text-primary/80">Total sales</div>
-          <div className="mt-1 text-3xl font-bold text-primary">{gbp.format(lifetime)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{campaigns.length} bookings</div>
+          <div className="text-xs uppercase tracking-widest text-primary/80">
+            {thisYear} sales
+          </div>
+          <div className="mt-1 text-3xl font-bold text-primary">{gbp.format(ytd)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">whole year, booked so far</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">
-            {thisYear} issues
+            {lastYear} sales
           </div>
-          <div className="mt-1 text-3xl font-bold">{gbp.format(ytd)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">whole year, booked so far</div>
+          <div className="mt-1 text-3xl font-bold">{gbp.format(lastYearTotal)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">full year</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">

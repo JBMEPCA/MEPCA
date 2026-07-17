@@ -67,9 +67,6 @@ export default async function SalesPage({
     ...m,
     target: targetForMonth(m.month, { magazine: mag.slug }),
   }));
-  let lifetime = 0;
-  for (const c of campaigns) lifetime += Number(c.value ?? 0);
-
   // Chart: last 12 months + (on issue view) everything booked ahead
   const chartMonths = monthly
     ? buildSeries(campaigns.filter((c) => c.saleDate), (c) => c.saleDate!)
@@ -77,9 +74,15 @@ export default async function SalesPage({
   const firstShown = Math.max(0, chartMonths.filter((m) => !m.future).length - 12);
   const chartData = chartMonths.slice(firstShown);
 
-  const ytd = months
-    .filter((m) => m.month.startsWith(thisYear))
-    .reduce((s, m) => s + m.total, 0);
+  // Year tiles sum raw values (not per-month rounded ones) so they match
+  // FileMaker's own totals to the pound
+  const yearTotal = (y: string) =>
+    campaigns
+      .filter((c) => format(c.startDate!, "yyyy") === y)
+      .reduce((s, c) => s + Number(c.value ?? 0), 0);
+  const ytd = yearTotal(thisYear);
+  const lastYear = String(Number(thisYear) - 1);
+  const lastYearTotal = yearTotal(lastYear);
   const currentIssue = months.find((m) => m.month === thisMonthKey);
   const nextIssue = months.find((m) => m.future);
   const futureTotal = months.filter((m) => m.future).reduce((s, m) => s + m.total, 0);
@@ -116,16 +119,18 @@ export default async function SalesPage({
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-primary/30 bg-primary/10 p-5">
-          <div className="text-xs uppercase tracking-widest text-primary/80">Total sales</div>
-          <div className="mt-1 text-3xl font-bold text-primary">{gbp.format(lifetime)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{campaigns.length} bookings</div>
+          <div className="text-xs uppercase tracking-widest text-primary/80">
+            {thisYear} sales
+          </div>
+          <div className="mt-1 text-3xl font-bold text-primary">{gbp.format(ytd)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">whole year, booked so far</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">
-            {thisYear} issues
+            {lastYear} sales
           </div>
-          <div className="mt-1 text-3xl font-bold">{gbp.format(ytd)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">whole year, booked so far</div>
+          <div className="mt-1 text-3xl font-bold">{gbp.format(lastYearTotal)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">full year</div>
         </div>
         <div className="rounded-2xl border bg-card p-5">
           <div className="text-xs uppercase tracking-widest text-muted-foreground">
