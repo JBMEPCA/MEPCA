@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
+import Link from "next/link";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SalesChart, type MonthlySales } from "@/components/sales/sales-chart";
 import { notFound } from "next/navigation";
@@ -16,12 +18,17 @@ const gbp = new Intl.NumberFormat("en-GB", {
 
 export default async function SalesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ magazine: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { magazine } = await params;
   const mag = getMagazine(magazine);
   if (!mag) notFound();
+  // "issue" (default) = revenue lands on the issue the booking runs in;
+  // "monthly" = revenue lands on the calendar month the sale was made.
+  const monthly = (await searchParams).view === "monthly";
 
   const campaigns = await db.campaign.findMany({
     where: { magazineId: mag.slug, startDate: { not: null } },
@@ -30,36 +37,45 @@ export default async function SalesPage({
     },
   });
 
-  // Revenue attributed to the issue each booking runs in
-  const byIssueMonth = new Map<string, { total: number; count: number }>();
-  let lifetime = 0;
-  for (const c of campaigns) {
-    const key = format(c.startDate!, "yyyy-MM");
-    const entry = byIssueMonth.get(key) ?? { total: 0, count: 0 };
-    entry.total += Number(c.value ?? 0);
-    entry.count += 1;
-    byIssueMonth.set(key, entry);
-    lifetime += Number(c.value ?? 0);
-  }
-
   const now = new Date();
   const thisMonthKey = format(now, "yyyy-MM");
   const thisYear = String(now.getFullYear());
 
-  const months: MonthlySales[] = [...byIssueMonth.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, v]) => ({
-      month,
-      label: format(new Date(`${month}-01`), "MMM yy"),
-      total: Math.round(v.total),
-      count: v.count,
-      future: month > thisMonthKey,
-      target: targetForMonth(month, { magazine: mag.slug }),
-    }));
+  const buildSeries = (rows: typeof campaigns, dateOf: (c: (typeof campaigns)[number]) => Date) => {
+    const byMonth = new Map<string, { total: number; count: number }>();
+    for (const c of rows) {
+      const key = format(dateOf(c), "yyyy-MM");
+      const entry = byMonth.get(key) ?? { total: 0, count: 0 };
+      entry.total += Number(c.value ?? 0);
+      entry.count += 1;
+      byMonth.set(key, entry);
+    }
+    return [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, v]): MonthlySales => ({
+        month,
+        label: format(new Date(`${month}-01`), "MMM yy"),
+        total: Math.round(v.total),
+        count: v.count,
+        future: month > thisMonthKey,
+        target: null,
+      }));
+  };
 
-  // Show the last 12 issues plus everything booked in the future
-  const firstShown = Math.max(0, months.filter((m) => !m.future).length - 12);
-  const chartData = months.slice(firstShown);
+  // Stat tiles always speak in issues, whichever chart view is showing
+  const months = buildSeries(campaigns, (c) => c.startDate!).map((m) => ({
+    ...m,
+    target: targetForMonth(m.month, { magazine: mag.slug }),
+  }));
+  let lifetime = 0;
+  for (const c of campaigns) lifetime += Number(c.value ?? 0);
+
+  // Chart: last 12 months + (on issue view) everything booked ahead
+  const chartMonths = monthly
+    ? buildSeries(campaigns.filter((c) => c.saleDate), (c) => c.saleDate!)
+    : months;
+  const firstShown = Math.max(0, chartMonths.filter((m) => !m.future).length - 12);
+  const chartData = chartMonths.slice(firstShown);
 
   const ytd = months
     .filter((m) => m.month.startsWith(thisYear))
@@ -79,11 +95,23 @@ export default async function SalesPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Sales</h1>
-        <p className="text-sm text-muted-foreground">
-          Revenue by issue — including issues still to come. Purple bars are the future.
-        </p>
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{mag.shortName} Sales</h1>
+          <p className="text-sm text-muted-foreground">
+            {monthly
+              ? "Sales by calendar month — when the booking was made, whichever issue it runs in."
+              : "Revenue by issue — including issues still to come. Purple bars are the future."}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link href={`/${mag.slug}/sales`}>
+            <Badge variant={!monthly ? "default" : "outline"}>On Issue</Badge>
+          </Link>
+          <Link href={`/${mag.slug}/sales?view=monthly`}>
+            <Badge variant={monthly ? "default" : "outline"}>Monthly Sales</Badge>
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -121,12 +149,18 @@ export default async function SalesPage({
 
       <Card>
         <CardHeader>
-          <CardTitle>Revenue by issue — last 12 + upcoming</CardTitle>
+          <CardTitle>
+            {monthly ? "Sales by month — last 12" : "Revenue by issue — last 12 + upcoming"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesChart data={chartData} />
+          <SalesChart
+            data={chartData}
+            revenueLabel={monthly ? "Sold this month" : "Issue revenue"}
+          />
           <p className="mt-2 text-xs text-muted-foreground">
             Best issue ever: {best.label} at {gbp.format(best.total)}
+            {monthly && " · Monthly view only counts bookings with a recorded sale date"}
           </p>
         </CardContent>
       </Card>

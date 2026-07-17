@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  Bar, CartesianGrid, Cell, ComposedChart, Line, ReferenceLine,
-  ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, CartesianGrid, Cell, ComposedChart, ReferenceLine,
+  ResponsiveContainer, Scatter, Tooltip, XAxis, YAxis,
 } from "recharts";
 
 export type MonthlySales = {
@@ -11,7 +11,7 @@ export type MonthlySales = {
   total: number;
   count: number;
   future: boolean;
-  target?: number | null; // red line — 2026 months only
+  target?: number | null; // red dash on the bar — 2026 months only
 };
 
 const gbp = new Intl.NumberFormat("en-GB", {
@@ -20,7 +20,25 @@ const gbp = new Intl.NumberFormat("en-GB", {
   maximumFractionDigits: 0,
 });
 
-export function SalesChart({ data }: { data: MonthlySales[] }) {
+// A straight dashed red line across one bar at its target height
+function TargetDash(props: unknown) {
+  const { cx, cy } = props as { cx?: number; cy?: number };
+  if (cx == null || cy == null) return null;
+  return (
+    <line
+      x1={cx - 16} x2={cx + 16} y1={cy} y2={cy}
+      stroke="#f87171" strokeWidth={2.5} strokeDasharray="5 3"
+    />
+  );
+}
+
+export function SalesChart({
+  data,
+  revenueLabel = "Issue revenue",
+}: {
+  data: MonthlySales[];
+  revenueLabel?: string;
+}) {
   const nowLabel = data.find((d) => d.future)?.label;
   const hasTarget = data.some((d) => d.target != null);
   return (
@@ -68,7 +86,7 @@ export function SalesChart({ data }: { data: MonthlySales[] }) {
             labelStyle={{ color: "#94a3b8" }}
             formatter={(value, name) => [
               gbp.format(Number(value)),
-              name === "target" ? "Target" : "Issue revenue",
+              name === "target" ? "Target" : revenueLabel,
             ]}
           />
           {nowLabel && (
@@ -85,16 +103,7 @@ export function SalesChart({ data }: { data: MonthlySales[] }) {
             ))}
           </Bar>
           {hasTarget && (
-            <Line
-              dataKey="target"
-              type="monotone"
-              stroke="#f87171"
-              strokeWidth={2}
-              strokeDasharray="6 3"
-              dot={false}
-              connectNulls={false}
-              isAnimationActive={false}
-            />
+            <Scatter dataKey="target" shape={TargetDash} isAnimationActive={false} />
           )}
         </ComposedChart>
       </ResponsiveContainer>

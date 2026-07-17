@@ -23,9 +23,12 @@ const gbp = new Intl.NumberFormat("en-GB", {
 export default async function CogentSalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mag?: string; person?: string }>;
+  searchParams: Promise<{ mag?: string; person?: string; view?: string }>;
 }) {
-  const { mag, person } = await searchParams;
+  const { mag, person, view } = await searchParams;
+  // "issue" (default) = revenue lands on the issue the booking runs in;
+  // "monthly" = revenue lands on the calendar month the sale was made.
+  const monthly = view === "monthly";
 
   const campaigns = await db.campaign.findMany({
     where: {
@@ -49,36 +52,46 @@ export default async function CogentSalesPage({
   });
   const people = peopleRows.map((r) => r.salesperson!).filter(Boolean);
 
-  // Monthly revenue attributed to the issue each booking runs in
-  const byMonth = new Map<string, { total: number; count: number }>();
-  let lifetime = 0;
-  for (const c of campaigns) {
-    const key = format(c.startDate!, "yyyy-MM");
-    const entry = byMonth.get(key) ?? { total: 0, count: 0 };
-    entry.total += Number(c.value ?? 0);
-    entry.count += 1;
-    byMonth.set(key, entry);
-    lifetime += Number(c.value ?? 0);
-  }
-
   const now = new Date();
   const thisMonthKey = format(now, "yyyy-MM");
   const thisYear = String(now.getFullYear());
 
-  const months: MonthlySales[] = [...byMonth.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([month, v]) => ({
-      month,
-      label: format(new Date(`${month}-01`), "MMM yy"),
-      total: Math.round(v.total),
-      count: v.count,
-      future: month > thisMonthKey,
-      // person filter → their personal target; magazine filter → that title's
-      // target; no filter → whole-company target
-      target: targetForMonth(month, { magazine: mag, person }),
-    }));
-  const firstShown = Math.max(0, months.filter((m) => !m.future).length - 12);
-  const chartData = months.slice(firstShown);
+  const buildSeries = (rows: typeof campaigns, dateOf: (c: (typeof campaigns)[number]) => Date) => {
+    const byMonth = new Map<string, { total: number; count: number }>();
+    for (const c of rows) {
+      const key = format(dateOf(c), "yyyy-MM");
+      const entry = byMonth.get(key) ?? { total: 0, count: 0 };
+      entry.total += Number(c.value ?? 0);
+      entry.count += 1;
+      byMonth.set(key, entry);
+    }
+    return [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, v]): MonthlySales => ({
+        month,
+        label: format(new Date(`${month}-01`), "MMM yy"),
+        total: Math.round(v.total),
+        count: v.count,
+        future: month > thisMonthKey,
+        target: null,
+      }));
+  };
+
+  // Stat tiles always speak in issues, whichever chart view is showing
+  const months = buildSeries(campaigns, (c) => c.startDate!).map((m) => ({
+    ...m,
+    // person filter → their personal target; magazine filter → that title's
+    // target; no filter → whole-company target. On Issue view only.
+    target: targetForMonth(m.month, { magazine: mag, person }),
+  }));
+  let lifetime = 0;
+  for (const c of campaigns) lifetime += Number(c.value ?? 0);
+
+  const chartMonths = monthly
+    ? buildSeries(campaigns.filter((c) => c.saleDate), (c) => c.saleDate!)
+    : months;
+  const firstShown = Math.max(0, chartMonths.filter((m) => !m.future).length - 12);
+  const chartData = chartMonths.slice(firstShown);
 
   const ytd = months.filter((m) => m.month.startsWith(thisYear)).reduce((s, m) => s + m.total, 0);
   const thisIssue = months.find((m) => m.month === thisMonthKey);
@@ -115,8 +128,8 @@ export default async function CogentSalesPage({
     .sort((a, b) => b.saleDate!.getTime() - a.saleDate!.getTime())
     .slice(0, 12);
 
-  const filterLink = (params: { mag?: string; person?: string }) => {
-    const merged = { mag, person, ...params };
+  const filterLink = (params: { mag?: string; person?: string; view?: string }) => {
+    const merged = { mag, person, view, ...params };
     const qs = Object.entries(merged)
       .filter(([, v]) => v)
       .map(([k, v]) => `${k}=${encodeURIComponent(v!)}`)
@@ -134,6 +147,13 @@ export default async function CogentSalesPage({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <Link href={filterLink({ view: undefined })}>
+          <Badge variant={!monthly ? "default" : "outline"}>On Issue</Badge>
+        </Link>
+        <Link href={filterLink({ view: "monthly" })}>
+          <Badge variant={monthly ? "default" : "outline"}>Monthly Sales</Badge>
+        </Link>
+        <span className="mx-1 text-muted-foreground">|</span>
         <Link href={filterLink({ mag: undefined })}>
           <Badge variant={!mag ? "default" : "outline"}>All magazines</Badge>
         </Link>
@@ -190,13 +210,21 @@ export default async function CogentSalesPage({
       <Card>
         <CardHeader>
           <CardTitle>
-            Revenue by issue — last 12 + upcoming
+            {monthly ? "Sales by month — last 12" : "Revenue by issue — last 12 + upcoming"}
             {mag && ` · ${getMagazine(mag)?.shortName ?? mag}`}
             {person && ` · ${person}`}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <SalesChart data={chartData} />
+          <SalesChart
+            data={chartData}
+            revenueLabel={monthly ? "Sold this month" : "Issue revenue"}
+          />
+          {monthly && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Monthly view only counts bookings with a recorded sale date.
+            </p>
+          )}
         </CardContent>
       </Card>
 
