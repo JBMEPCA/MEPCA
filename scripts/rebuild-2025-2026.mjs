@@ -58,9 +58,10 @@ function parseIssue(issue) {
 
 function parseAmount(raw) {
   if (!raw) return { amount: 0, cancelled: false };
-  if (/canx|cancel|xxx/i.test(raw)) return { amount: 0, cancelled: true };
-  const n = Number(raw.replace(/[£,\s]/g, ""));
-  return { amount: isNaN(n) ? 0 : n, cancelled: false }; // FREE / pop → £0
+  // canc/canx/cancel…, duped, moved, ignore = dead rows, not sales
+  if (/canx|canc|xxx|duped|moved|ignore/i.test(raw)) return { amount: 0, cancelled: true };
+  const n = Number(raw.replace(/\+?\s*vat/i, "").replace(/[£,\s]/g, ""));
+  return { amount: isNaN(n) ? 0 : n, cancelled: false }; // FREE / pop / "?" → £0
 }
 
 function parseUkDate(s) {
@@ -92,22 +93,20 @@ function toRecords(file, { hasExtras }) {
     const { slug, month, year } = parseIssue(issueRaw);
     if (!slug) { skipped.unknown.n++; skipped.unknown.sum += amount; continue; }
 
-    let startDate, endDate, issueLabel;
+    let startDate = null, endDate = null, issueLabel = null;
     if (month !== null && year !== null) {
       startDate = new Date(year, month, 1);
       endDate = new Date(year, month + 1, 0);
       issueLabel = `${MONTH_LABEL[month]} ${year}`;
-    } else if (saleDate) {
-      startDate = new Date(saleDate.getFullYear(), saleDate.getMonth(), 1);
-      endDate = new Date(saleDate.getFullYear(), saleDate.getMonth() + 1, 0);
-      issueLabel = null;
-    } else {
+    } else if (!saleDate) {
       skipped.noDate++;
       continue;
     }
+    // else: annual/unspecified deal — keep dateless so it never lands on an
+    // On Issue month (matches the FM ledger); Monthly Sales uses saleDate.
 
     // MEPCA issues before 2025 already live in the hub's 2023-24 history
-    if (slug === "mepca" && startDate < new Date(2025, 0, 1)) { skipped.mepcaPre2025++; continue; }
+    if (slug === "mepca" && startDate && startDate < new Date(2025, 0, 1)) { skipped.mepcaPre2025++; continue; }
 
     records.push({
       magazineId: slug,
@@ -127,6 +126,7 @@ function toRecords(file, { hasExtras }) {
 
 function statusFor(startDate, endDate) {
   const now = new Date();
+  if (!startDate || !endDate) return "COMPLETED"; // dateless annual deals
   if (endDate < now) return "COMPLETED";
   if (startDate <= now) return "LIVE";
   return "UPCOMING";
@@ -144,10 +144,24 @@ async function main() {
     extras.set(key, [...(extras.get(key) ?? []), c]);
   }
 
-  // 2. Parse both files (union, no dedupe — matches JB's verified totals)
+  // 2. Parse the files (union, no dedupe — matches JB's verified totals).
+  // The top-up file (FM July 26.pdf) may re-list rows already in the main
+  // 2026 export, so only its genuinely new rows are added.
   const f25 = toRecords("cim-fm-rows-2025.json", { hasExtras: false });
   const f26 = toRecords("cim-fm-rows.json", { hasExtras: true });
-  const all = [...f25.records, ...f26.records];
+  const fJul = toRecords("cim-fm-rows-jul.json", { hasExtras: true });
+  const seen = new Map();
+  for (const r of [...f25.records, ...f26.records]) {
+    const k = `${norm(r.brand)}|${norm(r.package)}|${r.issue}|${r.value}`;
+    seen.set(k, (seen.get(k) ?? 0) + 1);
+  }
+  const julNew = fJul.records.filter((r) => {
+    const k = `${norm(r.brand)}|${norm(r.package)}|${r.issue}|${r.value}`;
+    if ((seen.get(k) ?? 0) > 0) { seen.set(k, seen.get(k) - 1); return false; }
+    return true;
+  });
+  console.log(`top-up file: ${fJul.records.length} rows, ${julNew.length} new`);
+  const all = [...f25.records, ...f26.records, ...julNew];
 
   // 3. Reattach old MEPCA sale dates / salespeople / content ticks
   let reattached = 0;
@@ -165,21 +179,31 @@ async function main() {
 
   // Report
   const summary = {};
-  let mar = 0, apr = 0;
+  const byIssue = {};
+  let total26 = 0;
   for (const r of all) {
     summary[r.magazineId] = summary[r.magazineId] || { n: 0, sum: 0 };
     summary[r.magazineId].n++;
     summary[r.magazineId].sum += r.value;
-    if (r.issue === "Mar 2026") mar += r.value;
-    if (r.issue === "Apr 2026") apr += r.value;
+    if (r.issue?.endsWith("2026")) {
+      byIssue[r.issue] = (byIssue[r.issue] ?? 0) + r.value;
+      total26 += r.value;
+    }
   }
-  console.log("=== to insert (union of both files) ===");
+  console.log("=== to insert (union of the files) ===");
   for (const [k, v] of Object.entries(summary))
     console.log(` ${k}: ${v.n} bookings £${Math.round(v.sum).toLocaleString("en-GB")}`);
   console.log("skipped 2025 file:", JSON.stringify(f25.skipped));
   console.log("skipped 2026 file:", JSON.stringify(f26.skipped));
   console.log(`old MEPCA rows to delete: ${oldMepca.length}; extras reattached to new rows: ${reattached}`);
-  console.log(`ACCEPTANCE — Mar 2026: £${Math.round(mar).toLocaleString("en-GB")} (want 141,027) · Apr 2026: £${Math.round(apr).toLocaleString("en-GB")} (want 148,193)`);
+  const WANT = { "Jan 2026": 104213, "Feb 2026": 113490, "Mar 2026": 141027, "Apr 2026": 148193,
+    "May 2026": 136622, "Jun 2026": 150188, "Jul 2026": 148088, "Aug 2026": 111957 };
+  console.log("=== ACCEPTANCE vs JB's FM ledger ===");
+  for (const [k, want] of Object.entries(WANT)) {
+    const have = Math.round(byIssue[k] ?? 0);
+    console.log(` ${k}: £${have.toLocaleString("en-GB")} (JB £${want.toLocaleString("en-GB")}, diff ${(have - want).toLocaleString("en-GB")})`);
+  }
+  console.log(` 2026 issues total: £${Math.round(total26).toLocaleString("en-GB")} (JB £1,365,214)`);
 
   if (DRY) { console.log("(dry run — nothing written)"); return; }
 
@@ -196,6 +220,7 @@ async function main() {
       OR: [
         { magazineId: { notIn: ["mepca"] } },
         { magazineId: "mepca", startDate: { gte: new Date(2025, 0, 1) } },
+        { magazineId: "mepca", startDate: null }, // dateless annual deals from prior runs
       ],
     },
   });
