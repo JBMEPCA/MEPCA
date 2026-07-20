@@ -26,6 +26,7 @@ export type EshotDraft = {
   previewText: string;
   senderName: string;
   bodyHtml: string;
+  ctaUrl: string;
 };
 
 export type EshotMeta = {
@@ -72,6 +73,7 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
   "subject": string,      // the email subject line. If the copy contains an explicit subject (e.g. a line starting "Subject", "Subject Header", "Subject line"), use that text EXACTLY (minus the label). Otherwise write a concise, compelling subject from the copy. Never invent claims.
   "previewText": string,  // inbox preheader, UNDER 140 characters, complements the subject rather than repeating it, drawn from the copy
   "senderName": string,   // the advertiser company the e-shot is for, exactly as branded in the copy (e.g. "Verder Liquids") — this becomes the email's From name
+  "ctaUrl": string,       // the main destination URL: the CTA link from the copy, else the brand URL provided in the request, else the advertiser's homepage if it appears in the copy, else ""
   "bodyHtml": string      // the e-shot body as an HTML fragment (see rules)
 }
 
@@ -79,7 +81,7 @@ bodyHtml rules — follow exactly:
 - PRESERVE THE CLIENT'S WORDING. This is approved advertiser copy: keep every sentence as written. Only remove non-copy artefacts: the subject-line label, file boilerplate, "[image]" notes and similar.
 - Use <p> for paragraphs, <h2> for the section headings the copy already has (often bold lines), <ul>/<li> for bullet lists, <strong> where the copy is emphasised.
 - KEEP every hyperlink from the copy: <a href="URL" target="_blank">anchor text</a>. Never drop or shorten a tracking URL — reproduce it character-for-character.
-- The main call-to-action link (e.g. "Contact us", "Learn more", "Find out more") gets class="cta-button" on its <a> tag and sits in its own <p>. If the copy has no linked CTA but a brand URL is provided in the request, add one closing CTA button using that URL with a short label that fits the copy.
+- The main call-to-action link (e.g. "Contact us", "Learn more", "Find out more") gets class="cta-button" on its <a> tag and sits in its OWN <p> containing nothing else — no emoji, arrows or surrounding words. The sentence the CTA came from is REPLACED by the button: don't also keep it as text (exception to the preserve-wording rule; fold any essential remaining words into the previous paragraph). Keep the button label SHORT — 2 to 5 words (e.g. "Contact us", "Get a quote", "Learn more"). If the copy has no linked CTA but a brand URL is provided in the request, add one closing CTA button using that URL with a short label that fits the copy.
 - IMAGE MARKERS: there are exactly {{IMAGE_COUNT}} images supplied. Insert the literal markers [[IMAGE_1]], [[IMAGE_2]], … each on its own line. [[IMAGE_1]] goes at the VERY TOP as the hero banner, before any text. Spread the rest at sensible breaks between sections (never two in a row). If {{IMAGE_COUNT}} is 0, insert no markers.
 - Do not add copyright lines, unsubscribe text or a footer — the template adds those.`;
 

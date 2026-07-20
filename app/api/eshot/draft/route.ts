@@ -50,6 +50,7 @@ export async function POST(request: Request) {
         subject: meta.subject,
         previewText: meta.previewText,
         senderName: meta.senderName,
+        linkUrl: "",
         html: content,
       });
     }
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
       subject: draft.subject,
       previewText: draft.previewText,
       senderName: draft.senderName,
+      // House rule: every image links somewhere — CTA first, brand URL second.
+      linkUrl: (draft.ctaUrl ?? "").trim() || brandUrl,
       html,
     });
   } catch (e) {

@@ -2,31 +2,37 @@
 // is imported by both the API routes and the Builder UI (the browser needs the
 // same markup to render a faithful preview and to swap [[IMAGE_n]] markers).
 //
-// Email clients are hostile renderers: Outlook uses Word's engine and Gmail
-// clips <style> in places, so everything that matters is a table with INLINE
-// styles — the <style> block only carries the Lato @import for clients that
-// honour web fonts (Apple Mail, iOS); everyone else falls back to Helvetica/
-// Arial. House font is Lato per JB (20 Jul 2026). Client-supplied HTML in
-// "complete HTML" mode is never restyled — their fonts stand.
+// Style and compatibility choices are lifted from Cogent's own past sends
+// (probed 20 Jul 2026 — e.g. the MEPCA/Endoline solus):
+// - "View this email in your browser" (*|ARCHIVE|*) at the very top.
+// - Lato via a Google Fonts <link> hidden from Outlook with conditional
+//   comments; inline font stacks fall back to Helvetica/Arial everywhere.
+// - Buttons are TABLES: border-collapse:separate + border-radius:8px +
+//   background-color on the table, bold link inside — renders everywhere,
+//   unlike a styled <a> alone.
+// - EVERY image is wrapped in a link (the CTA or the client's homepage).
+// - mso-* / -ms-interpolation-mode hygiene for Outlook's Word engine.
+// Client-supplied HTML in "complete HTML" mode is never restyled.
 //
 // Layout: the body is split at every [[IMAGE_n]] marker, so images render as
-// their own full-bleed 600px rows and copy renders in padded rows between
-// them. That keeps Outlook happy (no width:100% images inside padded cells).
+// their own full-bleed 600px rows and copy renders in padded rows between.
 
-const FONT = `'Lato', Helvetica, Arial, sans-serif`;
-const COPY_STYLE = `margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.65;color:#333333;`;
+const FONT = `'Lato', 'Helvetica Neue', Helvetica, Arial, sans-serif`;
+const MSO = `mso-line-height-rule:exactly;-ms-text-size-adjust:100%;-webkit-text-size-adjust:100%;`;
+const COPY_STYLE = `margin:0 0 16px;font-family:${FONT};font-size:15px;line-height:1.65;color:#333333;${MSO}`;
 
-// Email-safe <img> used when an [[IMAGE_n]] marker is resolved. Markers sit in
-// full-bleed 600px cells, so a fixed width attribute is correct for Outlook
-// and the max-width keeps it responsive everywhere else.
-export function eshotImageTag(url: string, alt = ""): string {
-  return `<img src="${url}" alt="${alt}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;" />`;
+// Email-safe <img>; linkHref wraps it in an anchor — house rule: every image
+// links somewhere (main CTA or the client's homepage).
+export function eshotImageTag(url: string, alt = "", linkHref = ""): string {
+  const img = `<img src="${url}" alt="${alt}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;" />`;
+  if (!linkHref) return img;
+  return `<a href="${linkHref}" target="_blank" style="${MSO}">${img}</a>`;
 }
 
-export function replaceImageMarkers(html: string, urls: string[]): string {
+export function replaceImageMarkers(html: string, urls: string[], linkHref = ""): string {
   let out = html;
   urls.forEach((url, i) => {
-    out = out.replaceAll(`[[IMAGE_${i + 1}]]`, eshotImageTag(url));
+    out = out.replaceAll(`[[IMAGE_${i + 1}]]`, eshotImageTag(url, "", linkHref));
   });
   // A marker without a matching image: drop its whole (empty) row/paragraph.
   return out
@@ -35,21 +41,39 @@ export function replaceImageMarkers(html: string, urls: string[]): string {
     .replace(/\[\[IMAGE_\d+\]\]/g, "");
 }
 
+// Bulletproof CTA button, modelled on the mcnButton markup in past sends.
+function buttonTable(href: string, label: string): string {
+  return `<table role="presentation" align="center" border="0" cellpadding="0" cellspacing="0" style="border-collapse:separate !important;border-radius:8px;background-color:#1a6fb5;margin:8px auto 20px;">
+  <tr><td align="center" valign="middle" style="font-family:${FONT};font-size:16px;padding:16px 36px;${MSO}">
+    <a href="${href}" target="_blank" style="display:block;font-weight:bold;letter-spacing:normal;color:#ffffff;text-decoration:none;${MSO}">${label}</a>
+  </td></tr></table>`;
+}
+
 // Inject inline styles onto the plain tags Claude produces. Only touches tags
 // that don't already carry a style attribute, so it's safe to run twice.
 export function inlineEmailStyles(bodyHtml: string): string {
   let html = bodyHtml;
 
-  // Bulletproof CTA button first, before the generic anchor rule sees it.
-  html = html.replace(/<a([^>]*)class="cta-button"([^>]*)>/gi, (_m, pre, post) => {
-    const attrs = `${pre} ${post}`.replace(/\s+/g, " ").trim();
-    return `<a ${attrs} style="display:inline-block;background-color:#1a6fb5;color:#ffffff;font-family:${FONT};font-size:15px;font-weight:bold;line-height:1;text-decoration:none;padding:14px 30px;border-radius:4px;">`;
-  });
+  // CTA anchors become table buttons. First the tidy case — a paragraph
+  // holding just the CTA (allow stray arrows/emoji around it), then a
+  // fallback for a cta-button anchor sitting inside other text.
+  const btn = (attrs: string, label: string) => {
+    const href = attrs.match(/href="([^"]+)"/)?.[1] ?? "#";
+    return buttonTable(href, label.replace(/<[^>]+>/g, "").trim());
+  };
+  html = html.replace(
+    /<p[^>]*>[\s👉→]*<a([^>]*?)class="cta-button"([^>]*?)>([\s\S]*?)<\/a>[\s]*<\/p>/gi,
+    (_m, pre, post, label) => btn(`${pre} ${post}`, label)
+  );
+  html = html.replace(
+    /<a([^>]*?)class="cta-button"([^>]*?)>([\s\S]*?)<\/a>/gi,
+    (_m, pre, post, label) => btn(`${pre} ${post}`, label)
+  );
 
   html = html
     .replace(/<p(?![^>]*style=)/gi, `<p style="${COPY_STYLE}"`)
-    .replace(/<h2(?![^>]*style=)/gi, `<h2 style="margin:24px 0 12px;font-family:${FONT};font-size:20px;font-weight:bold;line-height:1.3;color:#111111;"`)
-    .replace(/<h3(?![^>]*style=)/gi, `<h3 style="margin:20px 0 10px;font-family:${FONT};font-size:17px;font-weight:bold;line-height:1.3;color:#111111;"`)
+    .replace(/<h2(?![^>]*style=)/gi, `<h2 style="margin:24px 0 12px;font-family:${FONT};font-size:20px;font-weight:bold;line-height:1.3;color:#111111;${MSO}"`)
+    .replace(/<h3(?![^>]*style=)/gi, `<h3 style="margin:20px 0 10px;font-family:${FONT};font-size:17px;font-weight:bold;line-height:1.3;color:#111111;${MSO}"`)
     .replace(/<ul(?![^>]*style=)/gi, `<ul style="margin:0 0 16px;padding-left:22px;font-family:${FONT};font-size:15px;line-height:1.65;color:#333333;"`)
     .replace(/<ol(?![^>]*style=)/gi, `<ol style="margin:0 0 16px;padding-left:22px;font-family:${FONT};font-size:15px;line-height:1.65;color:#333333;"`)
     .replace(/<li(?![^>]*style=)/gi, `<li style="margin:0 0 6px;"`)
@@ -62,7 +86,7 @@ export function inlineEmailStyles(bodyHtml: string): string {
 // inside Mailchimp: *|UNSUB|* is the one-click unsubscribe URL and
 // *|LIST:ADDRESSLINE|* the account's postal address.
 export function complianceFooter(audienceName?: string): string {
-  const small = `font-family:${FONT};font-size:11px;line-height:1.6;color:#888888;`;
+  const small = `font-family:${FONT};font-size:11px;line-height:1.6;color:#888888;${MSO}`;
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="padding:20px 24px;">
     <p style="margin:0 0 6px;${small}">You are receiving this email as a subscriber${audienceName ? ` to ${audienceName}` : ""}.</p>
     <p style="margin:0 0 6px;${small}"><a href="*|UNSUB|*" style="color:#888888;text-decoration:underline;">Unsubscribe</a> &nbsp;&middot;&nbsp; <a href="*|UPDATE_PROFILE|*" style="color:#888888;text-decoration:underline;">Update preferences</a></p>
@@ -110,14 +134,15 @@ export function renderEshotHtml(opts: {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
 <title>${opts.subject.replace(/</g, "&lt;")}</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;700&display=swap');
-</style>
+<!--[if !mso]><!--><link href="https://fonts.googleapis.com/css?family=Lato:400,400i,700,700i" rel="stylesheet" /><!--<![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:#f2f2f2;">
+<body style="margin:0;padding:0;background-color:#f2f2f2;${MSO}">
   <center>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f2f2f2">
-    <tr><td align="center" style="padding:16px 0;">
+    <tr><td align="center" style="padding:12px;font-family:${FONT};font-size:11px;color:#656565;${MSO}">
+      <a href="*|ARCHIVE|*" target="_blank" style="color:#656565;text-decoration:underline;">View this email in your browser</a>
+    </td></tr>
+    <tr><td align="center" style="padding:0 0 16px;">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:600px;max-width:100%;">
 ${rows}
       </table>

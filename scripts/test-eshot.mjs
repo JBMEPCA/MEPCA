@@ -45,6 +45,7 @@ console.log(`✓ Claude structured it:`);
 console.log(`   subject: ${draft.subject}`);
 console.log(`   preview: ${draft.previewText}`);
 console.log(`   sender : ${draft.senderName}`);
+console.log(`   ctaUrl : ${draft.ctaUrl}`);
 
 // 3. Images → File Manager
 const urls = [];
@@ -58,7 +59,7 @@ for (const p of imagePaths) {
 
 // 4. Assemble final HTML
 let html = renderEshotHtml({ subject: draft.subject, bodyHtml: draft.bodyHtml, audienceName: mepca.name });
-html = replaceImageMarkers(html, urls);
+html = replaceImageMarkers(html, urls, draft.ctaUrl || "");
 html = ensureUnsubscribeFooter(html, mepca.name);
 console.log(`✓ final HTML assembled (${html.length} chars, unsub: ${html.includes("*|UNSUB|*")})`);
 

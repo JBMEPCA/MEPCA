@@ -139,7 +139,14 @@ type Audience = {
 
 type Seg = { id: number; name: string; memberCount: number };
 
-type Proposal = { subject: string; previewText: string; senderName: string; html: string };
+type Proposal = {
+  subject: string;
+  previewText: string;
+  senderName: string;
+  // Every image in a built e-shot links here (CTA or client homepage).
+  linkUrl: string;
+  html: string;
+};
 
 type Stage = "input" | "review" | "done";
 type Mode = "files" | "html";
@@ -346,7 +353,7 @@ export function EshotBuilder() {
 
   function previewHtml(): string {
     if (!p) return "";
-    if (mode === "files") return replaceImageMarkers(p.html, imagePreviews);
+    if (mode === "files") return replaceImageMarkers(p.html, imagePreviews, p.linkUrl.trim());
     let html = p.html;
     localRefs.forEach((ref) => {
       const idx = images.findIndex((f) => f.name.toLowerCase() === baseName(ref));
@@ -393,7 +400,7 @@ export function EshotBuilder() {
           setStatus(`Uploading image ${i + 1} of ${images.length} to Mailchimp…`);
           urls.push(await uploadOne(images[i]));
         }
-        finalHtml = replaceImageMarkers(finalHtml, urls);
+        finalHtml = replaceImageMarkers(finalHtml, urls, p.linkUrl.trim());
       } else {
         for (let i = 0; i < localRefs.length; i++) {
           const ref = localRefs[i];
@@ -790,6 +797,40 @@ export function EshotBuilder() {
               <Input type="email" value={replyTo} onChange={(e) => setReplyTo(e.target.value)} />
             </div>
           </div>
+
+          {mode === "files" && (
+            <div>
+              <Label className="mb-1.5">
+                Images link to{" "}
+                <span className="font-normal text-muted-foreground">
+                  (every image is clickable — the CTA or the client&apos;s homepage)
+                </span>
+              </Label>
+              <Input
+                type="url"
+                value={p.linkUrl}
+                onChange={(e) => setP({ ...p, linkUrl: e.target.value })}
+                placeholder="https://client.com"
+              />
+              {!p.linkUrl.trim() && (
+                <p className="mt-1 text-xs text-amber-500">
+                  No link found in the copy — add one so the images aren&apos;t dead ends.
+                </p>
+              )}
+            </div>
+          )}
+
+          {mode === "html" &&
+            (() => {
+              const total = (p.html.match(/<img/gi) ?? []).length;
+              const linked = (p.html.match(/<a[^>]*>[\s\S]{0,200}?<img/gi) ?? []).length;
+              return total > linked ? (
+                <p className="text-xs text-amber-500">
+                  Heads-up: {total - linked} of the {total} images in this HTML don&apos;t appear to
+                  be linked. House style is every image clickable — worth checking with the client.
+                </p>
+              ) : null;
+            })()}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
