@@ -200,6 +200,37 @@ export async function setCampaignContent(campaignId: string, html: string): Prom
   });
 }
 
+// ---- Templates (what makes Hub-built campaigns editable in Mailchimp) ----
+// A campaign whose content is set from a template with mc:edit regions opens
+// in Mailchimp's campaign editor with those regions as editable blocks —
+// unlike raw-HTML campaigns, which the digital team can only edit as code.
+// The API cannot create campaigns for Mailchimp's NEW drag-and-drop builder;
+// template regions are as editable as the API gets.
+
+export async function findOrCreateTemplate(name: string, html: string): Promise<number> {
+  const existing = await mc<{ templates: { id: number; name: string }[] }>(
+    `/templates?type=user&count=1000&fields=templates.id,templates.name`
+  );
+  const hit = (existing.templates ?? []).find((t) => t.name === name);
+  if (hit) return hit.id;
+  const created = await mc<{ id: number }>("/templates", {
+    method: "POST",
+    body: JSON.stringify({ name, html }),
+  });
+  return created.id;
+}
+
+export async function setCampaignContentFromTemplate(
+  campaignId: string,
+  templateId: number,
+  sections: Record<string, string>
+): Promise<void> {
+  await mc(`/campaigns/${campaignId}/content`, {
+    method: "PUT",
+    body: JSON.stringify({ template: { id: templateId, sections } }),
+  });
+}
+
 export async function sendTestEmail(campaignId: string, emails: string[]): Promise<void> {
   await mc(`/campaigns/${campaignId}/actions/test`, {
     method: "POST",

@@ -100,6 +100,62 @@ export async function structureEshot(
   return draft;
 }
 
+// One round of the review-stage amend chat: apply an instruction like "make
+// the button orange" or "change the link to …" to the current proof. Works on
+// the styled body (files mode) or the full client HTML (html mode), and may
+// also adjust the campaign fields when the instruction asks for it.
+export type EshotAmendment = {
+  html: string;
+  subject: string;
+  previewText: string;
+  senderName: string;
+  linkUrl: string;
+  note: string;
+};
+
+export async function amendEshot(input: {
+  html: string;
+  subject: string;
+  previewText: string;
+  senderName: string;
+  linkUrl: string;
+  instruction: string;
+}): Promise<EshotAmendment> {
+  const amended = await askForJson<EshotAmendment>(
+    `You are amending the proof of a solus promotional e-shot for a trade-magazine publisher. You get the current email HTML, the campaign fields, and one instruction from the user. Apply EXACTLY what the instruction asks — nothing more. These are usually small client amends: wording tweaks, sizes, colours, links, subject changes.
+
+Return ONLY a JSON object (no fence, no commentary) with exactly these keys:
+{
+  "html": string,        // the amended HTML. If the instruction doesn't touch the layout/content, return it UNCHANGED character-for-character.
+  "subject": string,     // the (possibly amended) subject line
+  "previewText": string, // the (possibly amended) preview text, under 140 characters
+  "senderName": string,  // the (possibly amended) From name
+  "linkUrl": string,     // the (possibly amended) URL that images link to
+  "note": string         // one short sentence saying what you changed, e.g. "Made the button orange." — or what you couldn't do and why
+}
+
+HTML rules:
+- Styles are INLINE (email HTML) — amend sizes/colours by editing the style attributes, keeping the rest of each style intact.
+- NEVER remove or alter [[IMAGE_n]] markers or *|…|* merge tags unless explicitly told to.
+- Keep all URLs character-for-character unless the instruction changes them.
+- Do not reformat, re-indent or "clean up" anything you weren't asked to touch.`,
+    `Current campaign fields:
+subject: ${input.subject}
+previewText: ${input.previewText}
+senderName: ${input.senderName}
+linkUrl (images/CTA): ${input.linkUrl}
+
+Instruction: ${input.instruction}
+
+---
+
+Current HTML:
+${input.html.slice(0, 150_000)}`
+  );
+  amended.previewText = (amended.previewText ?? "").slice(0, 150);
+  return amended;
+}
+
 export async function extractEshotMeta(html: string): Promise<EshotMeta> {
   const meta = await askForJson<EshotMeta>(
     `You are given a finished promotional solus e-shot as HTML, sent by a trade-magazine publisher on behalf of an advertiser client. Suggest its campaign metadata. Return ONLY a JSON object (no fence, no commentary) with exactly these keys:

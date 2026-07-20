@@ -12,12 +12,26 @@ import {
   listSegments,
   uploadImage,
   createDraftCampaign,
-  setCampaignContent,
+  findOrCreateTemplate,
+  setCampaignContentFromTemplate,
   sendTestEmail,
   ALWAYS_TEST_RECIPIENT,
 } from "../lib/mailchimp.ts";
-import { renderEshotHtml, replaceImageMarkers, ensureUnsubscribeFooter } from "../lib/eshot-template.ts";
+import {
+  inlineEmailStyles,
+  buildTemplateSections,
+  hubTemplateShell,
+  HUB_TEMPLATE_NAME,
+} from "../lib/eshot-template.ts";
 import { structureEshot } from "../lib/eshot-ai.ts";
+
+async function mcGet(path) {
+  const key = process.env.MAILCHIMP_API_KEY;
+  const res = await fetch(`https://${key.split("-").pop()}.api.mailchimp.com/3.0${path}`, {
+    headers: { Authorization: "Basic " + Buffer.from(`anystring:${key}`).toString("base64") },
+  });
+  return res.json();
+}
 
 const [docxPath, ...imagePaths] = process.argv.slice(2);
 if (!docxPath) {
@@ -57,18 +71,17 @@ for (const p of imagePaths) {
   urls.push(url);
 }
 
-// 4. Assemble final HTML
-let html = renderEshotHtml({ subject: draft.subject, bodyHtml: draft.bodyHtml, audienceName: mepca.name });
-html = replaceImageMarkers(html, urls, draft.ctaUrl || "");
-html = ensureUnsubscribeFooter(html, mepca.name);
-console.log(`✓ final HTML assembled (${html.length} chars, unsub: ${html.includes("*|UNSUB|*")})`);
+// 4. Sections for the editable template (hero + body)
+const styled = inlineEmailStyles(draft.bodyHtml);
+const sections = buildTemplateSections(styled, urls, draft.ctaUrl || "");
+console.log(`✓ sections built (hero: ${sections.hero.length} chars, body: ${sections.body.length} chars)`);
 
 // 5. Draft campaign with an exclusion
 const campaign = await createDraftCampaign({
   listId: mepca.id,
   subject: draft.subject,
   previewText: draft.previewText,
-  title: `[Cogent Hub test v2 — email-safe/Lato] ${draft.senderName} — ${draft.subject}`,
+  title: `[Cogent Hub test v4 — editable] ${draft.senderName} — ${draft.subject}`,
   fromName: draft.senderName,
   replyTo: mepca.defaultFromEmail,
   excludeStaticSegmentIds: exclude ? [exclude.id] : [],
@@ -76,9 +89,21 @@ const campaign = await createDraftCampaign({
 console.log(`✓ draft campaign created (excluding "${exclude?.name ?? "nothing"}")`);
 console.log(`   edit: ${campaign.editUrl}`);
 
-// 6. Content + test send
-await setCampaignContent(campaign.id, html);
-console.log("✓ content set");
-const testTo = [ALWAYS_TEST_RECIPIENT, ...(process.env.EXTRA_TEST_EMAIL ? [process.env.EXTRA_TEST_EMAIL] : [])];
-await sendTestEmail(campaign.id, testTo);
-console.log(`✓ test email sent to ${testTo.join(", ")}`);
+// 6. Content via the shared editable template
+const templateId = await findOrCreateTemplate(HUB_TEMPLATE_NAME, hubTemplateShell());
+console.log(`✓ template "${HUB_TEMPLATE_NAME}" ready (id ${templateId})`);
+await setCampaignContentFromTemplate(campaign.id, templateId, sections);
+console.log("✓ content set from template sections");
+
+// 7. Confirm the campaign is template-based (= editable in the campaign editor)
+const check = await mcGet(`/campaigns/${campaign.id}?fields=settings.template_id,content_type`);
+console.log(`✓ campaign content_type: ${check.content_type}, template_id: ${check.settings?.template_id}`);
+
+// 8. Test send (skip with NO_TEST=1)
+if (process.env.NO_TEST === "1") {
+  console.log("· test email skipped (NO_TEST=1)");
+} else {
+  const testTo = [ALWAYS_TEST_RECIPIENT, ...(process.env.EXTRA_TEST_EMAIL ? [process.env.EXTRA_TEST_EMAIL] : [])];
+  await sendTestEmail(campaign.id, testTo);
+  console.log(`✓ test email sent to ${testTo.join(", ")}`);
+}

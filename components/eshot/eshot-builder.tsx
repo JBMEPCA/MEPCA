@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { replaceImageMarkers } from "@/lib/eshot-template";
+import { buildTemplateSections, fillTemplateShell } from "@/lib/eshot-template";
 
 // The E-shot Builder: drag in either a finished client HTML e-shot, or the
 // raw pieces (copy + images), review the draft in-app, then create it as a
@@ -145,6 +145,11 @@ type Proposal = {
   senderName: string;
   // Every image in a built e-shot links here (CTA or client homepage).
   linkUrl: string;
+  // Styled body with [[IMAGE_n]] markers — "build from files" mode. Slotted
+  // into the shared template shell, which is what makes the Mailchimp draft
+  // editable region-by-region.
+  bodyHtml: string;
+  // The untouched client document — "complete HTML" mode.
   html: string;
 };
 
@@ -181,6 +186,11 @@ export function EshotBuilder() {
   const [replyTo, setReplyTo] = useState("");
   const [sendDate, setSendDate] = useState("");
   const [extraTestEmail, setExtraTestEmail] = useState("");
+
+  // Amend chat — prompt-driven tweaks to the proof before it goes anywhere.
+  const [amendInput, setAmendInput] = useState("");
+  const [amendLog, setAmendLog] = useState<{ instruction: string; note: string }[]>([]);
+  const [amendBusy, setAmendBusy] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -353,7 +363,13 @@ export function EshotBuilder() {
 
   function previewHtml(): string {
     if (!p) return "";
-    if (mode === "files") return replaceImageMarkers(p.html, imagePreviews, p.linkUrl.trim());
+    if (mode === "files") {
+      const sections = buildTemplateSections(p.bodyHtml, imagePreviews, p.linkUrl.trim());
+      return fillTemplateShell(sections, {
+        subject: p.subject,
+        audienceName: audience?.name,
+      });
+    }
     let html = p.html;
     localRefs.forEach((ref) => {
       const idx = images.findIndex((f) => f.name.toLowerCase() === baseName(ref));
@@ -394,13 +410,15 @@ export function EshotBuilder() {
     setError(null);
     try {
       let finalHtml = p.html;
+      let sections: { hero: string; body: string } | null = null;
       if (mode === "files") {
         const urls: string[] = [];
         for (let i = 0; i < images.length; i++) {
           setStatus(`Uploading image ${i + 1} of ${images.length} to Mailchimp…`);
           urls.push(await uploadOne(images[i]));
         }
-        finalHtml = replaceImageMarkers(finalHtml, urls, p.linkUrl.trim());
+        sections = buildTemplateSections(p.bodyHtml, urls, p.linkUrl.trim());
+        finalHtml = "";
       } else {
         for (let i = 0; i < localRefs.length; i++) {
           const ref = localRefs[i];
@@ -426,6 +444,7 @@ export function EshotBuilder() {
           replyTo,
           sendDate,
           html: finalHtml,
+          sections,
           extraTestEmail,
         }),
       });
@@ -441,6 +460,48 @@ export function EshotBuilder() {
       setError(e instanceof Error ? e.message : "Something went wrong creating the draft.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function applyAmend() {
+    if (!p || amendBusy) return;
+    const instruction = amendInput.trim();
+    if (!instruction) return;
+    setAmendBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/eshot/amend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          html: mode === "files" ? p.bodyHtml : p.html,
+          subject: p.subject,
+          previewText: p.previewText,
+          senderName: p.senderName,
+          linkUrl: p.linkUrl,
+          instruction,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Couldn't apply that amend. Try rewording it.");
+        return;
+      }
+      setP({
+        ...p,
+        subject: data.subject,
+        previewText: data.previewText,
+        senderName: data.senderName,
+        linkUrl: data.linkUrl,
+        bodyHtml: mode === "files" ? data.html : p.bodyHtml,
+        html: mode === "html" ? data.html : p.html,
+      });
+      setAmendLog((log) => [...log, { instruction, note: data.note ?? "Done." }]);
+      setAmendInput("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't apply that amend.");
+    } finally {
+      setAmendBusy(false);
     }
   }
 
@@ -462,6 +523,8 @@ export function EshotBuilder() {
     setResult(null);
     setError(null);
     setStatus(null);
+    setAmendInput("");
+    setAmendLog([]);
   }
 
   const excludedCount = excludeIds.length;
@@ -871,14 +934,53 @@ export function EshotBuilder() {
           </Button>
         </div>
 
-        <div className="space-y-2">
-          <Label>E-shot preview</Label>
-          <iframe
-            title="E-shot preview"
-            sandbox=""
-            srcDoc={previewHtml()}
-            className="h-[42rem] w-full rounded-xl border border-border bg-white"
-          />
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>E-shot preview</Label>
+            <iframe
+              title="E-shot preview"
+              sandbox=""
+              srcDoc={previewHtml()}
+              className="h-[30rem] w-full rounded-xl border border-border bg-white"
+            />
+          </div>
+
+          {/* Amend chat — small client amends without leaving the Hub */}
+          <div className="rounded-xl border border-border p-3">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Amend with a prompt
+            </p>
+            {amendLog.length > 0 && (
+              <div className="mb-2 max-h-36 space-y-1.5 overflow-y-auto">
+                {amendLog.map((a, i) => (
+                  <div key={i} className="text-xs">
+                    <p className="font-medium">“{a.instruction}”</p>
+                    <p className="text-muted-foreground">✓ {a.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Input
+                value={amendInput}
+                onChange={(e) => setAmendInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyAmend();
+                  }
+                }}
+                disabled={amendBusy}
+                placeholder='e.g. "make the heading bigger", "button says Get a quote", "change the link to https://…"'
+              />
+              <Button onClick={applyAmend} disabled={amendBusy || !amendInput.trim()}>
+                {amendBusy ? "Applying…" : "Apply"}
+              </Button>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Changes only touch this proof — nothing goes to Mailchimp until you press Create.
+            </p>
+          </div>
         </div>
       </div>
     );

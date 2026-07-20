@@ -105,35 +105,25 @@ export function ensureUnsubscribeFooter(html: string, audienceName?: string): st
   return html + footer;
 }
 
-// Full document for "build from files" mode. bodyHtml may contain [[IMAGE_n]]
-// markers and a CTA anchor with class="cta-button".
-export function renderEshotHtml(opts: {
-  subject: string;
-  bodyHtml: string;
-  audienceName?: string;
-}): string {
-  const styled = inlineEmailStyles(opts.bodyHtml);
+// ---- The shared editable template ("build from files" mode) ----
+// One template lives in the Mailchimp account (created on first use, found by
+// name after that). Its two mc:edit regions — "hero" (banner image) and
+// "body" (copy, mid-copy images, button) — are what the digital team can
+// click and edit inside Mailchimp's campaign editor. Merge tags keep it
+// campaign-agnostic: *|MC:SUBJECT|* and *|LIST:NAME|* resolve per campaign.
+// Bump the version in the name whenever the shell markup changes, so stale
+// copies in the account aren't reused.
 
-  // Split at markers: images become full-bleed rows, copy becomes padded rows.
-  const parts = styled.split(/(\[\[IMAGE_\d+\]\])/);
-  const rows = parts
-    .map((part) => {
-      const p = part.trim();
-      if (!p) return "";
-      if (/^\[\[IMAGE_\d+\]\]$/.test(p)) {
-        return `<tr><td style="padding:0;">${p}</td></tr>`;
-      }
-      return `<tr><td style="padding:24px 32px 12px;">${p}</td></tr>`;
-    })
-    .join("\n");
+export const HUB_TEMPLATE_NAME = "Cogent Hub Solus v1";
 
+export function hubTemplateShell(): string {
   return `<!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<title>${opts.subject.replace(/</g, "&lt;")}</title>
+<title>*|MC:SUBJECT|*</title>
 <!--[if !mso]><!--><link href="https://fonts.googleapis.com/css?family=Lato:400,400i,700,700i" rel="stylesheet" /><!--<![endif]-->
 </head>
 <body style="margin:0;padding:0;background-color:#f2f2f2;${MSO}">
@@ -144,12 +134,54 @@ export function renderEshotHtml(opts: {
     </td></tr>
     <tr><td align="center" style="padding:0 0 16px;">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="width:600px;max-width:100%;">
-${rows}
+        <tr><td style="padding:0;"><div mc:edit="hero"></div></td></tr>
+        <tr><td style="padding:24px 32px 12px;"><div mc:edit="body"></div></td></tr>
       </table>
-${complianceFooter(opts.audienceName)}
+${complianceFooter("*|LIST:NAME|*")}
     </td></tr>
   </table>
   </center>
 </body>
 </html>`;
+}
+
+// Split a styled body (markers intact) into the template's two sections:
+// a leading [[IMAGE_1]] becomes the full-bleed hero, everything else is body.
+// imageUrls/linkHref resolve the markers (object URLs for preview, File
+// Manager URLs for the real thing).
+export function buildTemplateSections(
+  styledBodyHtml: string,
+  imageUrls: string[],
+  linkHref: string
+): { hero: string; body: string } {
+  let body = styledBodyHtml;
+  let hero = "";
+  if (imageUrls.length > 0 && body.trimStart().startsWith("[[IMAGE_1]]")) {
+    hero = eshotImageTag(imageUrls[0], "", linkHref);
+    body = body.replace("[[IMAGE_1]]", "");
+  }
+  return { hero, body: replaceImageMarkers(body, imageUrls, linkHref) };
+}
+
+// A full standalone document from the sections — used for the in-app preview
+// and as the raw-HTML fallback if the template flow ever fails. Substituting
+// into the same shell the template uses keeps the preview honest.
+export function fillTemplateShell(
+  sections: { hero: string; body: string },
+  display?: { subject?: string; audienceName?: string }
+): string {
+  let html = hubTemplateShell()
+    .replace(`<div mc:edit="hero"></div>`, `<div>${sections.hero}</div>`)
+    .replace(`<div mc:edit="body"></div>`, `<div>${sections.body}</div>`);
+  if (display) {
+    // Preview only: resolve the merge tags Mailchimp would fill in.
+    html = html
+      .replaceAll("*|MC:SUBJECT|*", (display.subject ?? "").replace(/</g, "&lt;"))
+      .replaceAll("*|LIST:NAME|*", display.audienceName ?? "our mailing list")
+      .replaceAll("*|ARCHIVE|*", "#")
+      .replaceAll("*|UNSUB|*", "#")
+      .replaceAll("*|UPDATE_PROFILE|*", "#")
+      .replaceAll("*|LIST:ADDRESSLINE|*", "Cogent Multimedia Ltd");
+  }
+  return html;
 }

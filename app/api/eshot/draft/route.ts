@@ -1,6 +1,6 @@
 import { hasMailchimpCreds } from "@/lib/mailchimp";
 import { structureEshot, extractEshotMeta } from "@/lib/eshot-ai";
-import { renderEshotHtml } from "@/lib/eshot-template";
+import { inlineEmailStyles } from "@/lib/eshot-template";
 
 // Builds the in-app draft proposal JB reviews — nothing is written to
 // Mailchimp here. Two modes:
@@ -51,23 +51,22 @@ export async function POST(request: Request) {
         previewText: meta.previewText,
         senderName: meta.senderName,
         linkUrl: "",
+        bodyHtml: "",
         html: content,
       });
     }
 
     const draft = await structureEshot(content, imageCount, brandUrl || undefined);
-    const html = renderEshotHtml({
-      subject: draft.subject,
-      bodyHtml: draft.bodyHtml,
-      audienceName: body.audienceName,
-    });
     return Response.json({
       subject: draft.subject,
       previewText: draft.previewText,
       senderName: draft.senderName,
       // House rule: every image links somewhere — CTA first, brand URL second.
       linkUrl: (draft.ctaUrl ?? "").trim() || brandUrl,
-      html,
+      // Styled body with [[IMAGE_n]] markers intact; the Builder slots it into
+      // the shared template shell for preview and for the editable campaign.
+      bodyHtml: inlineEmailStyles(draft.bodyHtml),
+      html: "",
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Something went wrong drafting the e-shot.";
