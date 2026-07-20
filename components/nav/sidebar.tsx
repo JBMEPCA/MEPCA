@@ -55,6 +55,14 @@ export function Sidebar({
         >
           Cogent Sales
         </Link>
+        <Link
+          href="/eshot"
+          className={`block rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-foreground ${
+            pathname === "/eshot" ? "bg-accent text-foreground" : "text-muted-foreground"
+          }`}
+        >
+          E-shot Builder
+        </Link>
         {user.isAdmin && (
           <Link
             href="/accounts"
