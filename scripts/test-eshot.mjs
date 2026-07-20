@@ -67,7 +67,7 @@ const campaign = await createDraftCampaign({
   listId: mepca.id,
   subject: draft.subject,
   previewText: draft.previewText,
-  title: `[Cogent Hub verification — safe to delete] ${draft.senderName} — ${draft.subject}`,
+  title: `[Cogent Hub test v2 — email-safe/Lato] ${draft.senderName} — ${draft.subject}`,
   fromName: draft.senderName,
   replyTo: mepca.defaultFromEmail,
   excludeStaticSegmentIds: exclude ? [exclude.id] : [],
@@ -78,5 +78,6 @@ console.log(`   edit: ${campaign.editUrl}`);
 // 6. Content + test send
 await setCampaignContent(campaign.id, html);
 console.log("✓ content set");
-await sendTestEmail(campaign.id, [ALWAYS_TEST_RECIPIENT]);
-console.log(`✓ test email sent to ${ALWAYS_TEST_RECIPIENT}`);
+const testTo = [ALWAYS_TEST_RECIPIENT, ...(process.env.EXTRA_TEST_EMAIL ? [process.env.EXTRA_TEST_EMAIL] : [])];
+await sendTestEmail(campaign.id, testTo);
+console.log(`✓ test email sent to ${testTo.join(", ")}`);
