@@ -237,26 +237,58 @@ export async function searchRelatedPosts(slug: string, query: string, perPage = 
   }
 }
 
-// Find an existing company taxonomy term by exact (case-insensitive) name, or
-// create it. Returns the term id to assign on the post. Only valid on sites
-// with the company taxonomy (MEPCA).
+// Normalise a company name for comparison: decode entities, treat "&"/"and"
+// alike, and ignore punctuation/spacing so "Briggs & Stratton", "Briggs &amp;
+// Stratton" and "Briggs and Stratton" all match.
+function normCompany(s: string): string {
+  return decodeEntities(s)
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+// Find an existing company taxonomy term, or create it. Returns the term id to
+// assign on the post. Only valid on sites with the company taxonomy (MEPCA).
 export async function findOrCreateCompany(slug: string, name: string): Promise<number | null> {
   if (!hasCompanyTaxonomy(slug)) return null;
   const clean = name.trim();
   if (!clean) return null;
-  const existing = await wpJson<{ id: number; name: string }[]>(
-    slug,
-    `/wp/v2/company?search=${encodeURIComponent(clean)}&per_page=100`
-  );
-  const match = existing.find((t) => decodeEntities(t.name).toLowerCase() === clean.toLowerCase());
-  if (match) return match.id;
+  const target = normCompany(clean);
 
-  const created = await wpJson<{ id: number }>(slug, `/wp/v2/company`, {
+  // WordPress' term search returns nothing for names containing "&" or long
+  // phrases, so search by the most distinctive single word, then match on the
+  // full normalised name.
+  const words = clean.replace(/[^A-Za-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+  const query = words.sort((a, b) => b.length - a.length)[0] ?? clean;
+  try {
+    const existing = await wpJson<{ id: number; name: string }[]>(
+      slug,
+      `/wp/v2/company?search=${encodeURIComponent(query)}&per_page=100`
+    );
+    const match = existing.find((t) => normCompany(t.name) === target);
+    if (match) return match.id;
+  } catch {
+    // Fall through and let the create step (with its term_exists handling) run.
+  }
+
+  // Create the term. If WordPress rejects it as a duplicate, it hands back the
+  // existing term id — use that instead of failing.
+  const res = await wpFetch(slug, `/wp/v2/company`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name: clean }),
   });
-  return created.id;
+  const data = (await res.json().catch(() => ({}))) as {
+    id?: number;
+    code?: string;
+    data?: { term_id?: number };
+  };
+  if (res.ok && typeof data.id === "number") return data.id;
+  if (data.code === "term_exists" && data.data?.term_id) return data.data.term_id;
+  throw new Error(
+    `WordPress POST /wp/v2/company failed (${res.status}): ${JSON.stringify(data).slice(0, 200)}`
+  );
 }
 
 export type DuplicateMatch = { id: number; title: string; link: string; status: string; score: number };
