@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { categoriesFor } from "@/lib/wordpress";
 import { getMagazine } from "@/lib/magazines";
+import { editorialStyle } from "@/lib/editorial-style";
 
 // Turns a raw press release / article into a structured, WordPress-ready
 // proposal that JB reviews before a draft is created. All the SEO/formatting
@@ -34,7 +35,7 @@ const STRUCTURE_INSTRUCTIONS = `You are {{MAG_NAME}}'s web editor. {{MAG_NAME}} 
 
 Return ONLY a JSON object (no markdown fence, no commentary) with these exact keys:
 {
-  "title": string,              // the article headline in Title Case (capitalise the main words; keep minor words like a/an/the/of/for/and/to lower-case unless first or last). Preserve deliberate brand/product capitalisation exactly (igus, xiros, iPhone, MEPCA). No site name.
+  "title": string,              // {{TITLE_RULE}}
   "category": string,           // EXACTLY one of the allowed categories below
   "company": string,            // the single primary company the article is about, full brand name as written
   "focusKeyphrase": string,     // 2-4 words someone would Google to find this; include the product/company where it helps ranking
@@ -55,8 +56,40 @@ bodyHtml rules (house style — follow exactly):
 - UK spelling (optimised, programmes, organisation, centre). Warm, professional, factual voice. No hype words ("groundbreaking", "revolutionary", "game-changing"). Do not invent facts.
 - Strip any tracking URLs, email artefacts, "for more information contact…" boilerplate, and image credits.
 - Link to the brand at least once: wrap the first mention of the primary company in <a href="[[SOURCE_URL]]" target="_blank" rel="noopener">Company Name</a>. Use the literal placeholder [[SOURCE_URL]] as the href — it is filled in later. If and only if there is genuinely no company to link, omit the anchor.
-- IMAGE PLACEHOLDERS: there are exactly {{IMAGE_COUNT}} in-article images to place in the body (this is separate from the feature image, which is handled elsewhere). Insert the literal markers [[IMAGE_1]], [[IMAGE_2]], … each on its own line at sensible points between paragraphs (never before the first paragraph, never two in a row). If {{IMAGE_COUNT}} is 0, insert no image markers.
+- IMAGE PLACEHOLDERS: there are exactly {{IMAGE_COUNT}} in-article images to place in the body (this is separate from the feature image, which is handled elsewhere). Insert the literal markers [[IMAGE_1]], [[IMAGE_2]], … each on its own line at sensible points between paragraphs (never before the first paragraph, never two in a row). If {{IMAGE_COUNT}} is 0, insert no image markers.{{EXTRA_RULES}}
 - Do not add internal links yourself here — that happens in a later step using internalLinkQueries.`;
+
+const DEFAULT_TITLE_RULE =
+  "the article headline in Title Case (capitalise the main words; keep minor words like a/an/the/of/for/and/to lower-case unless first or last). Preserve deliberate brand/product capitalisation exactly (igus, xiros, iPhone, MEPCA). No site name.";
+const UPPER_TITLE_RULE =
+  "the article headline in ALL CAPITALS — uppercase every letter of every word (e.g. \"NEW SPA OPENS AT THE GRAND HOTEL\"). No site name.";
+
+// Build the magazine-specific extra bodyHtml rules (About Us removal, hyperlink
+// preservation, pull quotes) from the editorial style config.
+function extraRules(slug: string): string {
+  const style = editorialStyle(slug);
+  const rules: string[] = [];
+  if (style.removeAboutSection) {
+    rules.push(
+      'Remove any "About Us", "About <company>", or company boilerplate/biography section (usually at the very end) entirely — do not include it or a heading for it.'
+    );
+  }
+  if (style.preserveHyperlinks) {
+    rules.push(
+      'The supplied article text may be HTML containing <a href="…"> hyperlinks. Keep every such hyperlink on the same anchor text in your output, with the href exactly as given. Do not invent links. If the primary company already has such a hyperlink in the source, keep that original link rather than replacing it with the [[SOURCE_URL]] placeholder.'
+    );
+  }
+  if (style.pullQuotes !== "none") {
+    const limit =
+      style.pullQuotes === "max-two"
+        ? "Use a MAXIMUM of one or two pull quotes in the whole article."
+        : "Use pull quotes throughout the article wherever they add impact.";
+    rules.push(
+      `${limit} A pull quote is a short, striking sentence or spokesperson quote that ALREADY appears in the article — never invent one. Render each as <figure class="wp-block-pullquote"><blockquote><p>QUOTE</p></blockquote></figure> on its own line between paragraphs.`
+    );
+  }
+  return rules.length ? "\n" + rules.map((r) => `- ${r}`).join("\n") : "";
+}
 
 function stripToJson(text: string): string {
   let t = text.trim();
@@ -81,11 +114,14 @@ export async function structureArticle(
     .map((c) => c.name)
     .join(", ");
 
+  const style = editorialStyle(magazineSlug);
   const text = sourceText.slice(0, 120_000);
   const system = STRUCTURE_INSTRUCTIONS.replaceAll("{{MAG_NAME}}", mag.name)
     .replaceAll("{{MAG_SECTOR}}", mag.sector)
     .replaceAll("{{CATEGORY_NAMES}}", categoryNames)
-    .replaceAll("{{IMAGE_COUNT}}", String(bodyImageCount));
+    .replaceAll("{{IMAGE_COUNT}}", String(bodyImageCount))
+    .replaceAll("{{TITLE_RULE}}", style.titleStyle === "upper" ? UPPER_TITLE_RULE : DEFAULT_TITLE_RULE)
+    .replaceAll("{{EXTRA_RULES}}", extraRules(magazineSlug));
 
   const response = await client().messages.create({
     model: MODEL,

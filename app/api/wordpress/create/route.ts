@@ -5,6 +5,7 @@ import {
   hasWordPressCreds,
 } from "@/lib/wordpress";
 import { applyHouseStyle } from "@/lib/house-style";
+import { editorialStyle } from "@/lib/editorial-style";
 
 // Assembles the final HTML (dropping in the already-uploaded images + brand
 // source link), creates/looks up the company term, and creates the DRAFT post.
@@ -81,11 +82,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "WordPress isn't connected for this magazine yet." }, { status: 400 });
   }
 
-  const title = (body.title ?? "").trim();
+  let title = (body.title ?? "").trim();
   const rawBody = (body.bodyHtml ?? "").trim();
   if (!title || !rawBody) {
     return Response.json({ error: "Title and body are required." }, { status: 400 });
   }
+  // House style: some titles (Hotel, Bar) are always uppercase.
+  if (editorialStyle(magazine).titleStyle === "upper") title = title.toUpperCase();
 
   const bodyImages = Array.isArray(body.bodyImages) ? body.bodyImages : [];
   const sourceUrl = (body.sourceUrl ?? "").trim();

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { applyHouseStyle } from "@/lib/house-style";
+import { editorialStyle } from "@/lib/editorial-style";
 
 // ---- File text extraction (browser-side, lazy-loaded like the LinkedIn tab) ----
 
@@ -34,6 +35,15 @@ async function extractDocxText(file: File): Promise<string> {
   return value.replace(/[ \t]+/g, " ").trim();
 }
 
+// For magazines that keep original hyperlinks, extract the .docx as HTML so the
+// <a href> links survive (extractRawText drops them). Embedded images are
+// stripped — mammoth would otherwise inline them as huge base64 data URIs.
+async function extractDocxHtml(file: File): Promise<string> {
+  const mammoth = await import("mammoth");
+  const { value } = await mammoth.convertToHtml({ arrayBuffer: await file.arrayBuffer() });
+  return value.replace(/<img[^>]*>/gi, "").replace(/[ \t]+/g, " ").trim();
+}
+
 // Legacy .doc (Word 97–2003) can't be parsed in the browser, so send the raw
 // file to the server, which reads it with word-extractor.
 async function extractDocText(file: File): Promise<string> {
@@ -53,10 +63,10 @@ async function extractDocText(file: File): Promise<string> {
   return (data.text as string).trim();
 }
 
-async function extractText(file: File): Promise<string> {
+async function extractText(file: File, preserveLinks: boolean): Promise<string> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".pdf")) return extractPdfText(file);
-  if (name.endsWith(".docx")) return extractDocxText(file);
+  if (name.endsWith(".docx")) return preserveLinks ? extractDocxHtml(file) : extractDocxText(file);
   if (name.endsWith(".doc")) return extractDocText(file);
   if (name.endsWith(".txt") || name.endsWith(".md")) return (await file.text()).trim();
   throw new Error("Unsupported file — use PDF, Word (.doc/.docx), TXT, or paste the text.");
@@ -159,7 +169,7 @@ export function WordPressPoster({ magazine }: { magazine: string }) {
     setError(null);
     try {
       setStatus("Reading the file…");
-      const t = await extractText(file);
+      const t = await extractText(file, editorialStyle(magazine).preserveHyperlinks);
       if (t.length < 200) {
         setError("Couldn't read enough text — it may be a scanned image. Paste the text instead.");
         setStatus(null);
@@ -215,7 +225,12 @@ export function WordPressPoster({ magazine }: { magazine: string }) {
         setError(data.error ?? "Something went wrong. Please try again.");
         return;
       }
-      setP(data as Proposal);
+      const proposal = data as Proposal;
+      // Show the title exactly as it will publish (uppercase for Hotel/Bar).
+      if (editorialStyle(magazine).titleStyle === "upper") {
+        proposal.title = proposal.title.toUpperCase();
+      }
+      setP(proposal);
       setStage("review");
       setStatus(null);
     } catch (e) {
@@ -649,7 +664,7 @@ export function WordPressPoster({ magazine }: { magazine: string }) {
                   <img src={featurePreview} alt="feature" className="w-full rounded-md" />
                 )}
                 <div
-                  className="space-y-3 [&_a]:text-primary [&_a]:underline [&_h4]:mt-4 [&_h4]:text-base [&_h4]:font-semibold [&_ul]:list-disc [&_ul]:pl-5"
+                  className="space-y-3 [&_a]:text-primary [&_a]:underline [&_h4]:mt-4 [&_h4]:text-base [&_h4]:font-semibold [&_ul]:list-disc [&_ul]:pl-5 [&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:text-base [&_blockquote]:font-medium [&_blockquote]:italic [&_figure.wp-block-pullquote]:my-4"
                   dangerouslySetInnerHTML={{ __html: previewHtml() }}
                 />
               </article>
