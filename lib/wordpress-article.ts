@@ -81,12 +81,12 @@ function extraRules(slug: string): string {
     );
   }
   if (style.pullQuotes !== "none") {
-    const limit =
+    const howMany =
       style.pullQuotes === "max-two"
-        ? "Use a MAXIMUM of one or two pull quotes in the whole article."
-        : "Use pull quotes wherever they add impact.";
+        ? "Turn AT MOST one or two of the quotations into pull quotes; if there are more, choose the one or two strongest and leave the rest as ordinary quoted text."
+        : "Turn each distinct quotation in the article into a pull quote.";
     rules.push(
-      `${limit} A pull quote MUST be a direct quotation — a passage that appears inside quotation marks in the source (something a named person actually said). Quote it verbatim, dropping the surrounding quotation marks. NEVER turn a heading, subheading, standfirst, or any sentence that is not inside quotation marks into a pull quote — if the source already shows pulled-out lines as headings, ignore them and choose the pull quotes yourself from the quotation-mark quotes. If the article has no quotation-mark quotes, use NO pull quotes. Render each as <figure class="wp-block-pullquote"><blockquote><p>QUOTE</p></blockquote></figure> on its own line between paragraphs.`
+      `PULL QUOTES: a pull quote is a passage that appears inside quotation marks — a direct quote from a named person. ${howMany} Put the ENTIRE quoted passage (everything within that set of quotation marks) into ONE pull quote — never split a single quotation into several, and never shorten it. Keep the attribution ("… said:", "said Jane Smith", "according to …") as ordinary <p> text next to the pull quote, NEVER inside it. Do NOT duplicate: quoted text must appear ONLY as the pull quote, never also as a normal paragraph. NEVER make a pull quote from a heading, subheading, standfirst or any text that is not inside quotation marks. Drop the surrounding quotation marks. Render each as <figure class="wp-block-pullquote"><blockquote><p>QUOTE</p></blockquote></figure> on its own line.`
     );
   }
   return rules.length ? "\n" + rules.map((r) => `- ${r}`).join("\n") : "";
