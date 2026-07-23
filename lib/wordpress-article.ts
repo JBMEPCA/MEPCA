@@ -38,8 +38,8 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
   "title": string,              // {{TITLE_RULE}}
   "category": string,           // EXACTLY one of the allowed categories below
   "company": string,            // the single primary company the article is about, full brand name as written
-  "focusKeyphrase": string,     // 2-4 words someone would Google to find this; include the product/company where it helps ranking
-  "metaDescription": string,    // UNDER 155 characters, naturally includes the focus keyphrase, plain prose
+  "focusKeyphrase": string,     // SEO ONLY — compose this yourself for best search ranking (this is the one place you may write your own wording): 2-4 words someone would Google to find this; include the product/company where it helps
+  "metaDescription": string,    // SEO ONLY — you may write this yourself for ranking (it is the Google snippet, not article content): UNDER 155 characters, naturally includes the focus keyphrase, plain prose
   "excerpt": string,            // the article's opening sentence (or two), taken verbatim from the supplied text — do not write your own
   "sourceUrl": string | null,   // the brand's own URL found in the text (their website or the release's source link); null if none is present
   "bodyHtml": string,           // the article body as HTML (see rules)
