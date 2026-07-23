@@ -83,9 +83,9 @@ function extraRules(slug: string): string {
     const limit =
       style.pullQuotes === "max-two"
         ? "Use a MAXIMUM of one or two pull quotes in the whole article."
-        : "Use pull quotes throughout the article wherever they add impact.";
+        : "Use pull quotes wherever they add impact.";
     rules.push(
-      `${limit} A pull quote is a short, striking sentence or spokesperson quote that ALREADY appears in the article — never invent one. Render each as <figure class="wp-block-pullquote"><blockquote><p>QUOTE</p></blockquote></figure> on its own line between paragraphs.`
+      `${limit} A pull quote MUST be a direct quotation — a passage that appears inside quotation marks in the source (something a named person actually said). Quote it verbatim, dropping the surrounding quotation marks. NEVER turn a heading, subheading, standfirst, or any sentence that is not inside quotation marks into a pull quote — if the source already shows pulled-out lines as headings, ignore them and choose the pull quotes yourself from the quotation-mark quotes. If the article has no quotation-mark quotes, use NO pull quotes. Render each as <figure class="wp-block-pullquote"><blockquote><p>QUOTE</p></blockquote></figure> on its own line between paragraphs.`
     );
   }
   return rules.length ? "\n" + rules.map((r) => `- ${r}`).join("\n") : "";
