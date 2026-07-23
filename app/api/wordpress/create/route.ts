@@ -37,7 +37,9 @@ function escapeHtml(s: string): string {
 function figure(img: BodyImage): string {
   const alt = escapeAttr(img.alt ?? "");
   const cap = img.caption ? `<figcaption>${escapeHtml(img.caption)}</figcaption>` : "";
-  return `<figure class="wp-block-image size-large"><img src="${escapeAttr(img.sourceUrl)}" alt="${alt}"/>${cap}</figure>`;
+  // Explicit vertical margin so there's clear space between the image and the
+  // surrounding text (some themes don't add enough on their own).
+  return `<figure class="wp-block-image size-large" style="margin-top:2em;margin-bottom:2em;"><img src="${escapeAttr(img.sourceUrl)}" alt="${alt}"/>${cap}</figure>`;
 }
 
 // Replace [[SOURCE_URL]] anchor and [[IMAGE_n]] markers with real content.

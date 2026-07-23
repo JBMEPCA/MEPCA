@@ -40,7 +40,7 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
   "company": string,            // the single primary company the article is about, full brand name as written
   "focusKeyphrase": string,     // 2-4 words someone would Google to find this; include the product/company where it helps ranking
   "metaDescription": string,    // UNDER 155 characters, naturally includes the focus keyphrase, plain prose
-  "excerpt": string,            // 1-2 sentence summary, plain prose, no dashes as separators
+  "excerpt": string,            // the article's opening sentence (or two), taken verbatim from the supplied text — do not write your own
   "sourceUrl": string | null,   // the brand's own URL found in the text (their website or the release's source link); null if none is present
   "bodyHtml": string,           // the article body as HTML (see rules)
   "internalLinkQueries": string[] // 3-5 short topic phrases to search {{MAG_NAME}}'s own site for related articles to link to
@@ -49,20 +49,21 @@ Return ONLY a JSON object (no markdown fence, no commentary) with these exact ke
 Allowed categories (pick the single best fit — never invent one): {{CATEGORY_NAMES}}
 
 bodyHtml rules (house style — follow exactly):
+- FORMAT ONLY — DO NOT WRITE: use the article's OWN words throughout. Do not invent, paraphrase, summarise, rewrite or add any sentence, subheading, standfirst or commentary of your own. Your job is to structure and format the supplied text, never to author new prose. (Keep the source's UK spelling; do not invent facts.)
 - Do NOT include the title (no heading tag for it).
-- Begin with a STANDFIRST: one short, engaging sentence summarising the article, wrapped in <h4>. Then start the opening paragraph.
-- Use <h4> for ALL section subheadings — never <h2> or <h3>. Use <p> for paragraphs and <ul>/<li> for bullet lists.
-- NEVER use bold. Do not use <strong> or <b> tags (or any bold styling) anywhere. Emphasise through wording, not formatting.
-- UK spelling (optimised, programmes, organisation, centre). Warm, professional, factual voice. No hype words ("groundbreaking", "revolutionary", "game-changing"). Do not invent facts.
+- Begin with a STANDFIRST: take the article's OWN opening paragraph — or, if that paragraph is long, its first sentence — VERBATIM, and wrap it in <h4>. Never write a new summary sentence. The body then continues from the text that follows it.
+- Only use subheadings that genuinely appear in the source text, styled as <h4> (never <h2>/<h3>). Do NOT create or invent subheadings of your own — many press releases have none at all, which is perfectly fine.
+- Use <p> for paragraphs and <ul>/<li> for any bullet lists present in the source.
+- NEVER use bold. Do not use <strong> or <b> tags (or any bold styling) anywhere.
 - Strip any tracking URLs, email artefacts, "for more information contact…" boilerplate, and image credits.
 - Link to the brand at least once: wrap the first mention of the primary company in <a href="[[SOURCE_URL]]" target="_blank" rel="noopener">Company Name</a>. Use the literal placeholder [[SOURCE_URL]] as the href — it is filled in later. If and only if there is genuinely no company to link, omit the anchor.
 - IMAGE PLACEHOLDERS: there are exactly {{IMAGE_COUNT}} in-article images to place in the body (this is separate from the feature image, which is handled elsewhere). Insert the literal markers [[IMAGE_1]], [[IMAGE_2]], … each on its own line at sensible points between paragraphs (never before the first paragraph, never two in a row). If {{IMAGE_COUNT}} is 0, insert no image markers.{{EXTRA_RULES}}
 - Do not add internal links yourself here — that happens in a later step using internalLinkQueries.`;
 
 const DEFAULT_TITLE_RULE =
-  "the article headline in Title Case (capitalise the main words; keep minor words like a/an/the/of/for/and/to lower-case unless first or last). Preserve deliberate brand/product capitalisation exactly (igus, xiros, iPhone, MEPCA). No site name.";
+  "the press release's OWN headline (do not invent one), in Title Case (capitalise the main words; keep minor words like a/an/the/of/for/and/to lower-case unless first or last). Preserve deliberate brand/product capitalisation exactly (igus, xiros, iPhone, MEPCA). No site name.";
 const UPPER_TITLE_RULE =
-  "the article headline in ALL CAPITALS — uppercase every letter of every word (e.g. \"NEW SPA OPENS AT THE GRAND HOTEL\"). No site name.";
+  'the press release\'s OWN headline (do not invent one), in ALL CAPITALS — uppercase every letter of every word (e.g. "NEW SPA OPENS AT THE GRAND HOTEL"). No site name.';
 
 // Build the magazine-specific extra bodyHtml rules (About Us removal, hyperlink
 // preservation, pull quotes) from the editorial style config.
